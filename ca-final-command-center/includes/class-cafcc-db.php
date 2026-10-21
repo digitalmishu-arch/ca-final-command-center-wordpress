@@ -9,7 +9,22 @@ final class CAFCC_DB {
         if (!in_array($entity, array('subjects', 'chapters', 'topics', 'documents', 'questions', 'progress'), true)) {
             throw new InvalidArgumentException('Unknown academic table.');
         }
-        return $wpdb->prefix . 'cafcc_' . $entity;
+        // The prototype used cafcc_questions/cafcc_progress with an incompatible
+        // schema and no verification metadata. Keep those tables untouched.
+        $suffix = array('questions' => 'question_references', 'progress' => 'student_progress');
+        return $wpdb->prefix . 'cafcc_' . ($suffix[$entity] ?? $entity);
+    }
+
+    public static function legacy_counts() {
+        global $wpdb;
+        $counts = array();
+        foreach (array('questions', 'progress') as $entity) {
+            $table = $wpdb->prefix . 'cafcc_' . $entity;
+            if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table))) === $table) {
+                $counts[$entity] = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table");
+            }
+        }
+        return $counts;
     }
 
     public static function activate($network_wide = false) {

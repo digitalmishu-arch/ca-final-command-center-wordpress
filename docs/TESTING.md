@@ -2,7 +2,7 @@
 
 ## Automated checks
 
-Run `bash tests/run-integration.sh` with Docker. It creates a private internal Docker network, MariaDB and WordPress with no published ports. It installs a disposable WordPress database, activates the plugin through WordPress's API and exercises real repository/REST code against that database. The script cleans up containers, anonymous database volumes and network on exit. Never point tests at production.
+Run `bash tests/run-integration.sh` with Docker for a fresh install, then `CAFCC_TEST_LEGACY=1 bash tests/run-integration.sh` for an installation with the earlier prototype schema. It creates a private internal Docker network, MariaDB and WordPress with no published ports. It installs a disposable WordPress database, activates the plugin through WordPress's API and exercises real repository/REST code against that database. The script cleans up containers, anonymous database volumes and network on exit. Never point tests at production.
 
 Coverage includes:
 
@@ -17,6 +17,7 @@ Coverage includes:
 - All four progress states, repeated writes, two students with separate explorer and summary results.
 - Real loopback HTTP requests through Apache and WordPress cookie authentication: anonymous, missing/invalid nonce, valid session, administrator access, denied student master writes and separate student progress.
 - Source-verification revocation hides references and excludes their saved progress from the summary.
+- Prototype dashboard shortcode compatibility and preservation of all old prototype question/progress fields and private notes during activation/reactivation.
 - Deactivation/reactivation preserve academic records and progress; incompatible schema blocks API access.
 - Private/no-store REST response headers.
 

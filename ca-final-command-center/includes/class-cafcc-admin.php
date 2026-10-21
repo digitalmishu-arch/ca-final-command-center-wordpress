@@ -27,6 +27,9 @@ final class CAFCC_Admin {
         ?>
         <div class="wrap cafcc" id="cafcc-admin">
             <h1>CA Final Command Center</h1>
+            <?php if (CAFCC_DB::legacy_counts()) : ?>
+                <div class="notice notice-warning inline"><p>Prototype question/progress tables were found and preserved without changes. They are separate from this verified academic database. Existing question text and student notes need a reviewed migration; they are not automatically published or mapped to new references.</p></div>
+            <?php endif; ?>
             <p>Add subjects, chapters, topics, source documents, then question references. Verify the official source before publishing a question.</p>
             <p>Only direct HTTPS ICAI resource links are accepted. No private Google Drive links. Removing verification immediately hides associated references from students.</p>
             <p id="cafcc-message" role="status" aria-live="polite"></p>

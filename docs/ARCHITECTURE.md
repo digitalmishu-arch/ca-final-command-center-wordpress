@@ -21,7 +21,7 @@ The plugin is pure PHP 8.1+, MySQL/MariaDB, vanilla browser JavaScript and CSS. 
 
 ## Data relationships
 
-Every custom table begins with the current WordPress site's `$wpdb->prefix . 'cafcc_'`.
+Every custom table begins with the current WordPress site's `$wpdb->prefix . 'cafcc_'`. Entities `questions` and `progress` map to suffixes `question_references` and `student_progress`; the other four entities use their entity names. The prototype's incompatible `cafcc_questions` and `cafcc_progress` tables are preserved without modification.
 
 ```mermaid
 erDiagram
@@ -52,6 +52,7 @@ Plugin version `0.1.0` is separate from schema version `1` in `cafcc_db_version`
 - Only successful setup advances the option. Repeating a partial migration does not duplicate subjects or erase existing records.
 - Future schema changes must increase `CAFCC_DB::VERSION`, add any required data transformation, and add migration regression tests. A stored newer schema is refused rather than downgraded; REST access fails closed with 503 until compatible code/setup is restored.
 - Network-wide activation is rejected. Per-site activation uses that site's prefix.
+- The earlier repository prototype has no verified source/syllabus metadata. Its tables and private notes remain untouched, an administrator notice explains the separation, and `[cafcc_dashboard]` aliases the new shortcode. No automatic legacy publication or progress-ID mapping is attempted. A reviewed legacy migration remains a future task when real prototype records exist.
 - There is no destructive deactivation/uninstall routine. Removing plugin files retains academic tables and progress.
 
 ## Security boundary

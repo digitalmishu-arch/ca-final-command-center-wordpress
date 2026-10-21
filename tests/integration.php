@@ -22,6 +22,24 @@ $editor = wp_create_user('editor_fixture', 'cafcc-disposable-only', 'editor@exam
 (new WP_User($editor))->set_role('editor');
 wp_set_current_user($admin);
 $plugin = 'ca-final-command-center/ca-final-command-center.php';
+$legacy_mode = '1' === getenv('CAFCC_TEST_LEGACY');
+if ($legacy_mode) {
+    global $wpdb;
+    // Reproduce the repository prototype's incompatible tables before upgrade.
+    $legacy_q = $wpdb->prefix . 'cafcc_questions';
+    $legacy_p = $wpdb->prefix . 'cafcc_progress';
+    $wpdb->query("CREATE TABLE $legacy_q (id bigint unsigned NOT NULL AUTO_INCREMENT, subject varchar(16) NOT NULL,
+        chapter varchar(190) NOT NULL, topic varchar(190) NOT NULL DEFAULT '', source_type varchar(16) NOT NULL DEFAULT '',
+        source_reference varchar(190) NOT NULL DEFAULT '', exam_term varchar(64) NOT NULL DEFAULT '',
+        question_text longtext NOT NULL, created_at datetime NOT NULL, PRIMARY KEY (id))");
+    $wpdb->query("CREATE TABLE $legacy_p (id bigint unsigned NOT NULL AUTO_INCREMENT, user_id bigint unsigned NOT NULL,
+        question_id bigint unsigned NOT NULL, status varchar(20) NOT NULL, notes text NOT NULL, updated_at datetime NOT NULL,
+        PRIMARY KEY (id), UNIQUE KEY user_question (user_id,question_id))");
+    $wpdb->insert($legacy_q, array('subject' => 'FR', 'chapter' => 'TEST ONLY legacy', 'question_text' => 'TEST ONLY unverified legacy text', 'created_at' => '2026-01-01 00:00:00'));
+    $wpdb->insert($legacy_p, array('user_id' => $student_a, 'question_id' => 1, 'status' => 'mastered', 'notes' => 'TEST ONLY private legacy note', 'updated_at' => '2026-01-01 00:00:00'));
+    $legacy_questions_before = $wpdb->get_results("SELECT * FROM $legacy_q", ARRAY_A);
+    $legacy_progress_before = $wpdb->get_results("SELECT * FROM $legacy_p", ARRAY_A);
+}
 $result = activate_plugin($plugin);
 if (is_wp_error($result)) { throw new RuntimeException($result->get_error_message()); }
 CAFCC_REST::init();
@@ -76,6 +94,12 @@ function http_api($method, $path, $body = null, $user_id = 0, $nonce = true) {
 }
 check(is_plugin_active($plugin), 'Plugin activates through the WordPress plugin API');
 check(CAFCC_DB::VERSION === get_option('cafcc_db_version'), 'Migration version recorded after setup');
+check(shortcode_exists('cafcc_dashboard'), 'Prototype dashboard shortcode remains supported');
+if ($legacy_mode) {
+    check(CAFCC_DB::legacy_counts() === array('questions' => 1, 'progress' => 1), 'Prototype tables detected independently of the new schema');
+    check($wpdb->get_results("SELECT * FROM $legacy_q", ARRAY_A) === $legacy_questions_before, 'Upgrade preserves every prototype question field');
+    check($wpdb->get_results("SELECT * FROM $legacy_p", ARRAY_A) === $legacy_progress_before, 'Upgrade preserves private prototype notes and progress unchanged');
+}
 check(CAFCC_Repository::listing('subjects')['total'] === 6, 'Exactly six CA Final subjects are seeded');
 foreach (array('chapters','topics','documents','questions') as $entity) {
     check(CAFCC_Repository::listing($entity)['total'] === 0, 'No invented ' . $entity . ' seeded');
@@ -180,6 +204,10 @@ global $wpdb;
 check((int) $wpdb->get_var('SELECT COUNT(*) FROM ' . CAFCC_DB::table('progress')) === 2, 'Deactivation preserves separate student progress');
 activate_plugin($plugin);
 check(CAFCC_Repository::listing('questions')['total'] === $before, 'Reactivation preserves records without duplication');
+if ($legacy_mode) {
+    check($wpdb->get_results("SELECT * FROM $legacy_q", ARRAY_A) === $legacy_questions_before &&
+        $wpdb->get_results("SELECT * FROM $legacy_p", ARRAY_A) === $legacy_progress_before, 'Reactivation leaves all prototype data untouched');
+}
 $response = apply_filters('rest_post_dispatch', call_api('GET', 'summary'), $server, new WP_REST_Request('GET', '/cafcc/v1/summary'));
 check(str_contains($response->get_headers()['Cache-Control'], 'no-store'), 'REST student data is marked private and no-store');
 update_option('cafcc_db_version', '999');

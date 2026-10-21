@@ -54,7 +54,13 @@ ca-final-command-center/
 
 ### If updating an existing test installation
 
-Back up the staging database/files, upload the newer plugin ZIP, and use WordPress's replace-version prompt. Existing academic records and progress remain. Migrations run after activation and when a newer schema version loads. Never downgrade the database or replace a live site without a separate approved release process.
+Back up the staging database/files, upload the newer plugin ZIP, and use WordPress's replace-version prompt. Existing academic records and progress remain. If updating the repository prototype, read the compatibility note below before expecting its old records in the new explorer. Migrations run after activation and when a newer schema version loads. Never downgrade the database or replace a live site without a separate approved release process.
+
+### Compatibility with the earlier repository prototype
+
+The earlier prototype used different question/progress schemas and the shortcode `[cafcc_dashboard]`. That shortcode remains an alias for the new dashboard. The new verified database uses separate `cafcc_question_references` and `cafcc_student_progress` tables. **Old `cafcc_questions` and `cafcc_progress` tables, including question text and private notes, are preserved unchanged.**
+
+An administrator notice identifies preserved prototype tables. Their contents are not automatically copied, published, or matched to new question IDs because they lack the required official source, syllabus and verification information. A reviewed legacy migration is a future task if those tables contain real data. Existing prototype progress will not appear in the new dashboard until such a mapping is implemented and reviewed.
 
 ## Add the first reviewed reference
 

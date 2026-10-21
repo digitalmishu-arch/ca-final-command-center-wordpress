@@ -5,7 +5,7 @@ For version 0.1.0, run in an isolated development environment:
 | Check | Result |
 | --- | --- |
 | PHP syntax, six plugin PHP files and integration runner | Passed |
-| WordPress/MariaDB integration suite | 132 assertions passed |
+| WordPress/MariaDB integration suite | 133 fresh-install assertions and 137 prototype-compatibility assertions passed |
 | Actual HTTP authentication/authorization cases within the suite | Passed |
 | JavaScript syntax, admin and student scripts | Passed |
 | Installable ZIP structure, CRC/integrity and single top-level folder | Passed |
