@@ -1,0 +1,29 @@
+name: Test and build WordPress plugin
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax and WordPress database/security integration tests
+        run: bash tests/run-integration.sh
+      - name: Check JavaScript syntax
+        run: |
+          node --check ca-final-command-center/assets/admin.js
+          node --check ca-final-command-center/assets/student.js
+      - name: Build installable ZIP
+        run: python3 scripts/build.py
+      - name: Upload downloadable plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: ca-final-command-center-0.1.0
+          path: dist/ca-final-command-center.zip
+          if-no-files-found: error
+          retention-days: 30

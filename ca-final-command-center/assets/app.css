@@ -1,0 +1,21 @@
+.cafcc { --cafcc-border:#cbd5e1; --cafcc-ink:#172b4d; color:var(--cafcc-ink); max-width:1200px; margin:1.5rem auto; padding:1rem; box-sizing:border-box; font-size:16px; line-height:1.6; }
+.cafcc *, .cafcc *::before, .cafcc *::after { box-sizing:border-box; }
+.cafcc h2, .cafcc h3, .cafcc h4 { color:inherit; line-height:1.3; }
+.cafcc a { color:#174b9b; text-decoration:underline; overflow-wrap:anywhere; }
+.cafcc label { display:block; margin:.8rem 0; font-weight:600; }
+.cafcc select, .cafcc input { display:block; width:100%; max-width:100%; min-height:44px; margin-top:.35rem; padding:.5rem; font:inherit; color:#172b4d; background:#fff; border:1px solid #64748b; border-radius:4px; }
+.cafcc button { min-height:44px; padding:.4rem .8rem; font:inherit; cursor:pointer; }
+.cafcc button:disabled, .cafcc select:disabled { opacity:.65; cursor:wait; }
+.cafcc :focus-visible { outline:3px solid #0759c9; outline-offset:3px; }
+.cafcc-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.75rem; margin:1rem 0 2rem; }
+.cafcc-stat { display:flex; flex-direction:column; padding:1rem; border:1px solid var(--cafcc-border); border-radius:6px; background:#f1f5f9; }
+.cafcc-stat strong { font-size:1.7rem; }
+.cafcc-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.cafcc-question, .cafcc-record, .cafcc-empty { padding:1rem; margin:1rem 0; border:1px solid var(--cafcc-border); border-radius:6px; background:#fff; overflow-wrap:anywhere; }
+.cafcc-question h4 { margin-top:0; }
+.cafcc-muted { color:#475569; font-size:.9em; }
+.cafcc-error { color:#9b1c1c; font-weight:600; }
+.cafcc-pages { display:flex; align-items:center; flex-wrap:wrap; gap:1rem; margin:1rem 0; }
+.cafcc-admin-columns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:2rem; }
+#cafcc-form { padding:1rem; border:1px solid var(--cafcc-border); background:#fff; margin-top:1rem; }
+@media (max-width:700px) { .cafcc-filters, .cafcc-admin-columns { grid-template-columns:1fr; gap:.5rem; } .cafcc { padding:.7rem; } }
