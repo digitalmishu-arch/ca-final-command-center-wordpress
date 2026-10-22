@@ -45,6 +45,7 @@ if (is_wp_error($result)) { throw new RuntimeException($result->get_error_messag
 CAFCC_REST::init();
 CAFCC_Admin::init();
 CAFCC_Frontend::init();
+CAFCC_Academic_UI::init();
 $server = rest_get_server();
 $count = 0;
 function check($condition, $label) {
@@ -67,7 +68,7 @@ function create_record($entity, $data) {
     if ($response->get_status() !== 200) { throw new RuntimeException($entity . ': ' . wp_json_encode($response->get_data())); }
     return $response->get_data();
 }
-function http_api($method, $path, $body = null, $user_id = 0, $nonce = true) {
+function http_api($method, $path, $body = null, $user_id = 0, $nonce = true, $version = "v1") {
     $previous_user = get_current_user_id();
     $previous_cookie = $_COOKIE[LOGGED_IN_COOKIE] ?? null;
     $headers = array('Content-Type: application/json');
@@ -83,7 +84,7 @@ function http_api($method, $path, $body = null, $user_id = 0, $nonce = true) {
     }
     $context = stream_context_create(array('http' => array('method' => $method, 'header' => implode("\r\n", $headers),
         'content' => null === $body ? '' : wp_json_encode($body), 'ignore_errors' => true, 'timeout' => 10, 'follow_location' => 0)));
-    $result = file_get_contents('http://localhost/index.php?rest_route=/cafcc/v1/' . $path, false, $context);
+    $result = file_get_contents('http://localhost/index.php?rest_route=/cafcc/' . $version . '/' . $path, false, $context);
     wp_set_current_user($previous_user);
     if (null === $previous_cookie) { unset($_COOKIE[LOGGED_IN_COOKIE]); } else { $_COOKIE[LOGGED_IN_COOKIE] = $previous_cookie; }
     preg_match('/\s([0-9]{3})\s/', $http_response_header[0] ?? '', $match);
@@ -214,4 +215,5 @@ update_option('cafcc_db_version', '999');
 check(call_api('GET', 'summary')->get_status() === 503, 'Incompatible database version blocks API access');
 check(is_wp_error(CAFCC_DB::migrate()), 'Database downgrade is refused');
 update_option('cafcc_db_version', CAFCC_DB::VERSION);
+require __DIR__ . "/v02.php";
 echo "\n$count integration assertions passed on WordPress " . get_bloginfo('version') . ', PHP ' . PHP_VERSION . ".\n";

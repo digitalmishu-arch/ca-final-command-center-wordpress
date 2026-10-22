@@ -9,7 +9,10 @@
         return node;
     };
     async function api(path, method = 'GET', body) {
-        const response = await fetch(CAFCCStudent.url + path, {
+        const [route, query = ''] = path.split('?');
+        const target = new URL(CAFCCStudent.url + route);
+        new URLSearchParams(query).forEach((value, key) => target.searchParams.set(key, value));
+        const response = await fetch(target, {
             method, credentials: 'same-origin', cache: 'no-store',
             headers: {'X-WP-Nonce': CAFCCStudent.nonce, 'Content-Type': 'application/json'},
             body: body ? JSON.stringify(body) : undefined

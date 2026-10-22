@@ -40,6 +40,10 @@ final class CAFCC_REST {
             register_rest_route('cafcc/v1', '/admin/' . $entity . '/(?P<id>[1-9][0-9]{0,17})', array(
                 array('methods' => 'PATCH', 'permission_callback' => $admin, 'callback' => function ($r) use ($entity) {
                     $data = self::body($r);
+                    if (!is_wp_error($data) && class_exists('CAFCC_Explorer')) {
+                        $valid=CAFCC_Explorer::validate_v1_change($entity,(int)$r['id'],$data);
+                        if (is_wp_error($valid)) { return $valid; }
+                    }
                     return is_wp_error($data) ? $data : CAFCC_Repository::save($entity, $data, (int) $r['id']);
                 }),
                 array('methods' => 'DELETE', 'permission_callback' => $admin, 'callback' => function ($r) use ($entity) {
@@ -80,7 +84,7 @@ final class CAFCC_REST {
     }
 
     public static function private_response($response, $server, $request) {
-        if (str_starts_with($request->get_route(), '/cafcc/v1/')) {
+        if ((str_starts_with($request->get_route(), '/cafcc/v1/') || str_starts_with($request->get_route(), '/cafcc/v2/'))) {
             $response->header('Cache-Control', 'private, no-store, max-age=0');
             $response->header('Vary', 'Cookie, X-WP-Nonce');
         }

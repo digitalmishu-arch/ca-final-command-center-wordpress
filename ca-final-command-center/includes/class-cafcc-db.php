@@ -2,10 +2,13 @@
 defined('ABSPATH') || exit;
 
 final class CAFCC_DB {
-    const VERSION = '1';
+    const VERSION = '2';
 
     public static function table($entity) {
         global $wpdb;
+        if (class_exists('CAFCC_Academic_DB') && in_array($entity, CAFCC_Academic_DB::entities(), true)) {
+            return $wpdb->prefix . 'cafcc_' . $entity;
+        }
         if (!in_array($entity, array('subjects', 'chapters', 'topics', 'documents', 'questions', 'progress'), true)) {
             throw new InvalidArgumentException('Unknown academic table.');
         }
@@ -118,6 +121,8 @@ final class CAFCC_DB {
                 return new WP_Error('cafcc_schema', 'Subject setup failed.');
             }
         }
+        $academic = CAFCC_Academic_DB::migrate();
+        if (is_wp_error($academic)) { return $academic; }
         update_option('cafcc_db_version', self::VERSION, false);
         return true;
     }

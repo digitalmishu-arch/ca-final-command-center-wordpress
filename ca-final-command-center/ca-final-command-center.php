@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CA Final Command Center
  * Description: Academic question references and private student progress for CA Final.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires at least: 6.6
  * Requires PHP: 8.1
  * Author: CA Final Command Center
@@ -11,9 +11,9 @@
  */
 
 defined('ABSPATH') || exit;
-define('CAFCC_VERSION', '0.1.0');
+define('CAFCC_VERSION', '0.2.0');
 define('CAFCC_FILE', __FILE__);
-foreach (array('db', 'repository', 'rest', 'admin', 'frontend') as $cafcc_component) {
+foreach (array('db', 'repository', 'academic-db', 'academic', 'import', 'explorer', 'rest', 'admin', 'frontend', 'academic-ui') as $cafcc_component) {
     require_once __DIR__ . '/includes/class-cafcc-' . $cafcc_component . '.php';
 }
 register_activation_hook(__FILE__, array('CAFCC_DB', 'activate'));
@@ -24,5 +24,6 @@ add_action('plugins_loaded', function () {
     CAFCC_REST::init();
     CAFCC_Admin::init();
     CAFCC_Frontend::init();
+    CAFCC_Academic_UI::init();
 });
 // Intentionally no destructive deactivation or uninstall hook.

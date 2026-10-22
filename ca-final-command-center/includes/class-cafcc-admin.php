@@ -27,6 +27,7 @@ final class CAFCC_Admin {
         ?>
         <div class="wrap cafcc" id="cafcc-admin">
             <h1>CA Final Command Center</h1>
+            <p><a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=cafcc-connected')); ?>">Open Version 0.2 connected academic manager</a></p>
             <?php if (CAFCC_DB::legacy_counts()) : ?>
                 <div class="notice notice-warning inline"><p>Prototype question/progress tables were found and preserved without changes. They are separate from this verified academic database. Existing question text and student notes need a reviewed migration; they are not automatically published or mapped to new references.</p></div>
             <?php endif; ?>

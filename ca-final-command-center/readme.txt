@@ -3,7 +3,7 @@ Contributors: digitalmishu-arch
 Tags: education, student-progress, academic-references
 Requires at least: 6.6
 Requires PHP: 8.1
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -16,5 +16,8 @@ Upload ca-final-command-center.zip via WordPress Admin > Plugins > Add New Plugi
 Seeds only six CA Final subjects. No real questions, chapters or exam attempts are included. Records must be reviewed by an administrator. Only verified published references from verified official sources appear to students. Deactivation and plugin-file deletion preserve database records.
 
 == Changelog ==
+= 0.2.0 =
+Connected edition-specific hierarchy, sourced draft starter catalogue, many-to-many classifications, unique source occurrences, answer rights modes, admin resource manager and transactional CSV review/import/withdrawal. Existing question/progress IDs are preserved. No hosting deployment.
+
 = 0.1.0 =
 Initial academic reference database, administrator CRUD, verification workflow, student explorer, private progress, tests and ZIP packaging.

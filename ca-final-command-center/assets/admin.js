@@ -15,7 +15,10 @@
     const option = (value, text) => { const node = el('option', text); node.value = value; return node; };
     const tell = (text, bad = false) => { message.textContent = text; message.classList.toggle('cafcc-error', bad); };
     async function api(path, method = 'GET', body) {
-        const response = await fetch(CAFCCAdmin.url + 'admin/' + path, {
+        const [route, query = ''] = path.split('?');
+        const target = new URL(CAFCCAdmin.url + 'admin/' + route);
+        new URLSearchParams(query).forEach((value, key) => target.searchParams.set(key, value));
+        const response = await fetch(target, {
             method, credentials: 'same-origin', cache: 'no-store',
             headers: {'X-WP-Nonce': CAFCCAdmin.nonce, 'Content-Type': 'application/json'},
             body: body ? JSON.stringify(body) : undefined

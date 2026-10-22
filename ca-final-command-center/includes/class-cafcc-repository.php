@@ -4,7 +4,7 @@ defined('ABSPATH') || exit;
 final class CAFCC_Repository {
     const STATUSES = array('not_started', 'attempted', 'needs_revision', 'completed');
     const VERIFICATION = array('unverified', 'verified', 'rejected');
-    const SOURCES = array('exam', 'rtp', 'mtp', 'study_material', 'other');
+    const SOURCES = array('exam', 'rtp', 'mtp', 'study_material', 'case_study', 'other');
 
     public static function entities() {
         return array('subjects', 'chapters', 'topics', 'documents', 'questions');
@@ -207,6 +207,9 @@ final class CAFCC_Repository {
         if (!in_array($entity, self::entities(), true) || !self::get($entity, $id)) {
             return self::error('Record not found.', 404);
         }
+        if (class_exists('CAFCC_Explorer') && CAFCC_Explorer::has_connections($entity,$id)) {
+            return self::error('This record has connected academic data. Unpublish it instead.',409);
+        }
         if (self::referenced($entity, $id)) {
             return self::error('This record is in use. Unpublish questions instead of deleting progress.', 409);
         }
@@ -224,7 +227,7 @@ final class CAFCC_Repository {
 
     public static function visible_where() {
         return "q.publication_status='published' AND q.verification_status='verified' AND d.verification_status='verified'
-            AND d.official_url<>'' AND d.syllabus_version=c.syllabus_version";
+            AND d.official_url<>'' AND d.syllabus_version=c.syllabus_version" . (class_exists('CAFCC_Explorer') ? CAFCC_Explorer::visibility_guard() : '');
     }
 
     public static function questions($filters, $user_id) {
