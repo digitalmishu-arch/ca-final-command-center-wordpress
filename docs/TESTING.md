@@ -1,45 +1,47 @@
-# Validation and acceptance checklist
+# Testing — Version 0.2.0
 
-## Automated checks
+## Reproducible automated checks
 
-Run `bash tests/run-integration.sh` with Docker for a fresh install, then `CAFCC_TEST_LEGACY=1 bash tests/run-integration.sh` for an installation with the earlier prototype schema. It creates a private internal Docker network, MariaDB and WordPress with no published ports. It installs a disposable WordPress database, activates the plugin through WordPress's API and exercises real repository/REST code against that database. The script cleans up containers, anonymous database volumes and network on exit. Never point tests at production.
+```sh
+bash tests/run-integration.sh
+CAFCC_TEST_LEGACY=1 bash tests/run-integration.sh
+node --check ca-final-command-center/assets/admin.js
+node --check ca-final-command-center/assets/student.js
+node --check ca-final-command-center/assets/explorer.js
+node --check ca-final-command-center/assets/manager.js
+python3 scripts/build.py
+```
 
-Coverage includes:
+Docker creates a disposable WordPress/MariaDB database and internal network; default tests publish no ports. Containers/volumes/network are removed afterward. No Hostinger credentials, endpoint or existing database is used. PHP syntax checks run inside the WordPress image. Node/Python are contributor/CI tools only.
 
-- PHP syntax for all plugin files and the test runner.
-- Activation, migration version, repeated migrations, exact six subject seeds and empty academic tables.
-- Administrator create/update/delete, HTML sanitization, field types, relational integrity and safe deletion.
-- Source allowlist rejection, missing official URLs, unverified publication and mismatched syllabus/topic rejection.
-- Anonymous, Subscriber and Editor denial for GET/POST/PATCH/DELETE on all five master collections.
-- A nonadministrator with `manage_options` still denied; direct repository writes also checked.
-- Missing/invalid nonces; invalid IDs and query-filter injection attempts.
-- Draft/hidden questions unavailable for student progress, enum validation and forged owner ID rejection.
-- All four progress states, repeated writes, two students with separate explorer and summary results.
-- Real loopback HTTP requests through Apache and WordPress cookie authentication: anonymous, missing/invalid nonce, valid session, administrator access, denied student master writes and separate student progress.
-- Source-verification revocation hides references and excludes their saved progress from the summary.
-- Prototype dashboard shortcode compatibility and preservation of all old prototype question/progress fields and private notes during activation/reactivation.
-- Deactivation/reactivation preserve academic records and progress; incompatible schema blocks API access.
-- Private/no-store REST response headers.
+`tests/integration.php` retains the Version 0.1 suite and includes `tests/v02.php`. The latter tests additive migrations against populated original tables with exact row comparisons; edition/hierarchy provenance and publication; every new collection's permissions; actual HTTP authentication; dependent paths; search; multiple tags; source/attempt combinations; verified marks; unique occurrences; IBS tags; answer rights/privacy; all five CSV imports; token ownership; retry idempotence; late duplicate races; atomic rollback; safe withdrawal and v1 compatibility guards. Synthetic fixtures are explicitly marked TEST ONLY and are outside the distributable folder.
 
-Fixtures use TEST ONLY labels and a non-existent example path on an allowlisted host. They establish behavior, not academic correctness. They are outside the distributable plugin folder.
+## Optional real browser smoke test
 
-JavaScript syntax: `node --check ca-final-command-center/assets/admin.js` and `node --check ca-final-command-center/assets/student.js`. ZIP structure/integrity is asserted by `python3 scripts/build.py`. CI repeats these checks before producing its artifact.
+Prerequisites: Python Playwright and Chromium installed in the development environment (the script currently uses `/usr/bin/chromium`).
 
-## Manual checks on private staging (not yet performed)
+```sh
+CAFCC_PREVIEW=1 bash tests/run-integration.sh
+python3 tests/browser-smoke.py
+```
 
-These require your WordPress/Hostinger environment and an iPad; they must not be reported as passed based on container tests.
+This mode keeps a disposable preview on **127.0.0.1:8092 only**, creates a local shortcode page and records its container/network names in `work/preview-containers.txt`. Its synthetic test accounts are not production credentials. The browser uses real WordPress login and APIs, tests the dependent FR path, mobile layout, administrator CSV preview/commit, reviewed answer modes and saved student status. It saves screenshots under `docs/previews/` before publishing any synthetic test question for the remaining UI assertions.
 
-1. **Backup and privacy:** record the latest database/files backup; confirm recovery options. Check staging needs hosting-level authentication in an incognito session. Do not rely on `noindex` or a Private page for whole-site protection.
-2. **Installation:** upload the inner plugin ZIP through Safari/Files; activate with no fatal error. Confirm the six subjects. Confirm the plugin created no page, published no content and changed no DNS.
-3. **Editor:** add one real chapter, optional topic, source document and draft reference. Verify the source yourself, approve it and publish the reference inside protected staging. Try a Google Drive URL and confirm rejection. Try a mismatched topic/syllabus and confirm rejection.
-4. **Dashboard:** put the shortcode on a page within protected staging. At iPad portrait and landscape widths confirm readable filters, cards, empty/error messages, touch-sized controls and keyboard focus. Check narrow phone width too if available.
-5. **Student isolation:** sign in as Subscriber A; mark a question Completed; reload. In another browser/session sign in as Subscriber B and confirm Not Started, then mark Needs Revision. Return to A and confirm Completed. Verify counts match real visible references.
-6. **Master access:** as each Subscriber and an Editor, open `/wp-admin/admin.php?page=cafcc`; WordPress must deny access. With the user's own REST nonce, POST/PATCH/DELETE the master routes and confirm 403. Without authentication expect 401; missing/invalid nonces must not permit writes.
-7. **Progress access:** try PUT with an extra `user_id` and confirm 400. Try another status or draft question ID and confirm rejection. No route should allow a student to request another student's progress.
-8. **Revocation:** as Administrator revoke document verification. Both students must stop seeing the reference and associated counts. Reverify the source; their prior individual progress should return.
-9. **Caching:** exclude the dashboard and REST URLs from LiteSpeed/Hostinger/CDN caches. Inspect REST responses for `private, no-store`. Repeat the two-account check after any cache changes. Reload an expired session to refresh the nonce.
-10. **Retention:** deactivate/reactivate and confirm records and progress remain. Do not delete tables as part of this check.
+Afterward, remove the two named containers with `docker rm -fv` and their named network with `docker network rm`, using exactly the names in `work/preview-containers.txt`. Never run preview fixtures against a real WordPress database; `tests/preview.php` requires the disposable `cafcc_test` database.
 
-## Practical limits
+## Manual acceptance on your protected Hostinger staging
 
-Automated tests use one WordPress/PHP/database combination and no real Hostinger services. Browser layout, assistive-technology behavior, third-party theme/plugin conflicts, Hostinger upload limits, real iPad Files interaction, HTTPS/cache behavior and backup recovery still require the checklist above. There are no end-to-end browser automation tests in 0.1.0.
+These checks remain unperformed here.
+
+1. Confirm staging URL and privacy protection; record a current database/files backup and restore option. Do not rely on `noindex` alone.
+2. Record existing source/question counts and two students' saved statuses. Upload the inner 0.2.0 plugin ZIP from iPad Files using WordPress's replace-version flow. Confirm version/schema setup without a fatal error. Nothing should automatically publish.
+3. Confirm old questions, prototype notes and progress remain. Inspect the six draft sourced editions and 180 starter hierarchy entries; check dates/applicability against source links. Do not assume the May 2026 baseline covers later tax attempts.
+4. Publish reviewed official headings for one edition. Approve any editorial topic/subtopic nodes separately. Confirm the student selectors load the actual dependent chapter/unit/topic/subtopic path. Try incompatible IDs through REST and confirm rejection.
+5. Add one real reviewed source, stable question, occurrence and multiple classifications. Check source title/URL, issue period/series, page and question/subquestion number. Leave marks empty unless verified.
+6. Test the source/attempt filters and search. Another appearance of the same question should retain the same stable question/progress identity. Duplicate appearance locations must be rejected.
+7. Use an authored/licensed solution only with a recorded rights basis. For unlicensed official answers, use only their URL and answer location. Verify draft/unpublished text stays hidden from students.
+8. In two separate Subscriber sessions, save different statuses and reload. Confirm neither session sees or changes the other student's progress. Anonymous users must be asked to sign in; students/editors must not use master/import/review routes or the admin manager.
+9. Download each CSV template, preview a small valid file, inspect Draft/Needs Review output, commit once and try a retry. Try invalid/duplicate records; they must not partly import. Withdraw a batch after test progress exists; references should disappear while progress/rows remain stored.
+10. Unpublish an incorrect occurrence/source/question. Test that hidden content cannot be reached through either REST namespace. Existing progress should reappear when the same permitted record is reviewed again; withdrawn import batches require a corrected new batch.
+11. Exclude dashboard and both REST namespaces from Hostinger/CDN/LiteSpeed caches, including plain `?rest_route=` URLs. Keep logged-in caching disabled and repeat the two-account check. Reload to renew expired nonces.
+12. On actual iPad Safari and a phone, test native selectors, touch targets, landscape/portrait, answer-panel keyboard/focus behavior and file upload/download. Check theme/plugin conflicts and backup restoration separately. Deactivation/reactivation should retain all records and statuses.

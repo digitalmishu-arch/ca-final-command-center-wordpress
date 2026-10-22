@@ -1,110 +1,113 @@
-# CA Final Command Center — WordPress plugin 0.1.0
+# CA Final Command Center — WordPress plugin 0.2.0
 
-A standalone PHP/MySQL WordPress plugin for CA Final academic references and individual student practice progress. Runs on ordinary WordPress hosting, including Hostinger Business. **No Node.js, Supabase, external application server, subscriptions or payments are needed on your hosting.**
+A connected CA Final syllabus and verified-question explorer for WordPress/PHP/MySQL, with vanilla JavaScript and CSS. No Node.js, separate application server, Supabase, payment service or external API is required on Hostinger.
 
-## Included in 0.1.0
+Version 0.2 is based on the complete **Version 0.1.0 implementation in PR #1**, not the older `main` prototype. Development branch: `feat/v0.2.0-connected-explorer`. Its pull request targets `feat/v0.1.0-foundation` so the changes can be reviewed separately. Neither PR is automatically merged or deployed.
 
-- Versioned, repeatable database installation and upgrades using the WordPress table prefix.
-- Six initial subjects: FR, AFM, Advanced Audit, DT, IDT and IBS.
-- Administrator editor for subjects, chapters, topics, source documents and question references.
-- Source type, exam attempt, syllabus version, question number, chapter/topic association, official URL, verification and publication states.
-- `[ca_final_command_center]` student dashboard and chapter-wise question explorer.
-- Per-account Not Started / Attempted / Needs Revision / Completed progress.
-- Empty states until verified references exist. No exam attempts, chapters, question content or analytics are invented or seeded.
-- A test-and-build GitHub Actions workflow with a downloadable installable ZIP.
+## What connects to what
 
-The code does **not** create a page, publish a site, register students, change DNS, contact Hostinger, or install other plugins. Only the six subject records are added automatically.
+**Subject → Syllabus edition → Chapter → ICAI unit → Topic → Subtopic → Matching questions.** Each selector obtains its options from the database and the selected parent path. The server rejects inconsistent combinations. Chapters without separately listed units do not receive invented unit headings. Modules are represented in the hierarchy and admin manager; the student chapter selector spans their chapters.
 
-## Requirements
+Questions retain stable IDs and can have several topic/subtopic tags, several official source occurrences, and a question-family association. IBS cases can carry several subject and topic tags. Progress remains keyed to the existing WordPress user and question IDs, not to individual appearances.
 
-- WordPress 6.6 or newer; PHP 8.1 or newer; MySQL 8.0+ or MariaDB 10.6+ recommended.
-- A normal administrator account with permission to upload plugins.
-- HTTPS for a hosted installation. Network-wide multisite activation is intentionally unsupported; activate per site.
-- Tested on WordPress 6.8.3, PHP 8.2.29 and MariaDB 11.4 in disposable containers. Hostinger and an actual iPad have not been accessed or tested.
+Included:
 
-## Install from an iPad
+- Versioned additive schema-2 installation and migrations; schema-1 and prototype data retained.
+- Six subjects and a sourced starter catalogue with **6 editions, 180 hierarchy records: 17 module/resource groups, 112 chapter/navigation entries, 45 units, 2 editorial topics and 4 editorial subtopics**.
+- Dependent student filters, exam-attempt/source filters, search, source cards, pagination, four practice states and reviewed answer panels.
+- Administrator taxonomy/resource editor, ordering, historical edition mappings, approval/publication, families/comparisons and non-destructive unpublishing.
+- Five CSV templates, validation/preview, duplicate checks, owner-bound commit tokens, append-only transactional imports and safe batch withdrawal.
+- PHP/database/REST tests, real browser smoke tests, iPad/phone viewport previews and GitHub Actions ZIP packaging.
 
-Use a private staging/development WordPress site with a current database/files backup first. This repository and its pull request do not deploy anything to Hostinger.
+**No real exam questions, marks, repeat percentages or solutions are seeded.** Research imports and the bundled hierarchy begin as Draft/Needs Review. Only reviewed published references appear to students.
 
-1. Download **`ca-final-command-center.zip`** into the iPad Files app. Do not upload GitHub's **Code → Download ZIP** source archive.
-2. In Safari, open the staging site's WordPress Admin. Sign in as an administrator.
-3. Go to **Plugins → Add New Plugin → Upload Plugin → Choose File → Browse** and select `ca-final-command-center.zip` from Files.
-4. Tap **Install Now**, then **Activate Plugin**. If upload is unavailable, verify your account's administrator permissions and whether hosting configuration disables file modifications. Do not change production configuration to work around this.
-5. Open **CA Final Command Center** in the WordPress Admin menu. You should see six subjects and no chapters, source documents or questions.
-6. Add a page on the private staging site and place `[ca_final_command_center]` in a Shortcode block. For an owner-only preview, keep it private. To test student accounts, use a staging site protected by hosting-level access control and make the test page accessible *within that protected site*. A WordPress Private page is not readable by ordinary Subscriber accounts.
-7. Use **Users → Add New** to create two test accounts with the **Subscriber** role. Test each account's dashboard and progress separately.
+## Source catalogue: scope and provenance
 
-A shortcode page requires a signed-in account to access academic questions. **This is not whole-site privacy protection.** Search-engine discouragement alone does not make staging private. Use Hostinger's available password/access protection on staging before real student or unpublished academic data is added.
+The baseline is ICAI's **May 2026 study-material listings**, as requested. This is not a claim that these editions remain applicable to every later examination. Edition dates, reprint dates, exam applicability and retrieval date are separate fields. Historical editions have separate IDs; mappings do not merge their questions or progress.
 
-### Download a ZIP from GitHub without a laptop
+The catalogue contains 173 exact official module/chapter/unit/resource labels and 7 explicitly editorial navigation/topic/subtopic entries. It does not claim complete fine-grained topic coverage across all six subjects. Most detailed topics/subtopics must be curated and reviewed through the manager or CSV import. IBS's official page lists case resources rather than a numbered chapter/unit syllabus; the cross-subject chapter grouping is editorial.
 
-Open this repository in Safari → **Actions → Test and build WordPress plugin** → open a successful run for the feature branch/PR → **Artifacts → ca-final-command-center-0.1.0**. GitHub sign-in may be required.
+See [source register and limitations](docs/SOURCES.md). For example, [ICAI's FR listing](https://www.icai.org/post/sm-final-p1-may2026) places Accounting and Reporting of Financial Instruments at Chapter 11 and Derivatives and Embedded Derivatives at Unit 4. Finer navigation tags under that unit are labelled Editorial, not ICAI headings.
 
-GitHub wraps artifacts in an outer ZIP. Tap that downloaded archive in Files to extract it. Inside is **`ca-final-command-center.zip`**, the file to upload to WordPress. Do not extract the inner plugin ZIP. Artifacts expire after 30 days; a new successful run creates another. The workflow runs on branch pushes and pull requests. After it reaches the default branch, **Run workflow** is also available manually.
+## Precise iPad staging installation/update
 
-The plugin ZIP contains:
+This repository does not access or modify `demo.cadeepanshuagarwal.in`. Perform these steps yourself only on that protected staging installation.
 
-```text
-ca-final-command-center/
-  ca-final-command-center.php
-  includes/
-  assets/
-  readme.txt
-```
+1. In Hostinger, confirm the target is **staging**, make a current **database and files backup**, and record the restore option. Confirm staging access protection. Search-engine discouragement alone is not privacy.
+2. In Safari, open the successful Version 0.2 GitHub Actions run. Under **Artifacts**, download **`ca-final-command-center-0.2.0`**. GitHub sign-in may be required.
+3. In Files → Downloads, tap the downloaded **outer artifact ZIP** to extract it. Inside is **`ca-final-command-center.zip`**. Keep that **inner ZIP compressed**. Do not upload GitHub's Code → Download ZIP source archive.
+4. Sign in to the staging site's WordPress Admin as Administrator. Open **Plugins → Add New Plugin → Upload Plugin → Choose File → Browse**, select the inner `ca-final-command-center.zip`, then tap **Install Now**.
+5. Because Version 0.1 is already installed, WordPress should show the existing plugin and offer **Replace current with uploaded**. Check the new version is **0.2.0**. Replace the plugin and activate it if WordPress leaves it inactive. Do not delete database tables or change the schema-version option.
+6. Open **CA Final Command Center → Connected academic manager**. Existing Version 0.1 records remain available through the original main menu. The new manager should contain the six researched editions and 180 draft hierarchy records on a clean upgrade.
+7. Review the source URLs, dates and applicability. Under **Review bundled ICAI hierarchy**, choose an edition, confirm you checked the source and publish its official headings. **Editorial nodes remain drafts** and need individual review in the taxonomy editor. The IBS editorial case chapter is approved separately.
+8. Existing shortcode pages continue working: `[ca_final_command_center]` and `[cafcc_dashboard]` are both supported. If creating a test page, do so only within protected staging. WordPress Private pages are not readable by ordinary Subscribers; use hosting-level staging protection when testing Subscriber access.
+9. Exclude the dashboard and both `/wp-json/cafcc/v1/*` and `/wp-json/cafcc/v2/*` (including the `?rest_route=` equivalents) from Hostinger/CDN/LiteSpeed caches. Keep logged-in page caching disabled. Test using two separate Subscriber sessions.
+10. Verify the dependent filters, first reviewed source/occurrence, answer access and separate progress before expanding content. See [staging acceptance checklist](docs/TESTING.md).
 
-### If updating an existing test installation
+The plugin ZIP has one top-level `ca-final-command-center/` folder containing the main PHP entry file, includes, assets, sourced catalogue and blank CSV templates. No test fixtures, screenshots or development tools are installed on Hostinger. GitHub artifacts expire after 30 days; another successful build produces a new artifact.
 
-Back up the staging database/files, upload the newer plugin ZIP, and use WordPress's replace-version prompt. Existing academic records and progress remain. If updating the repository prototype, read the compatibility note below before expecting its old records in the new explorer. Migrations run after activation and when a newer schema version loads. Never downgrade the database or replace a live site without a separate approved release process.
+## Add academic records in the manager
 
-### Compatibility with the earlier repository prototype
+Recommended order:
 
-The earlier prototype used different question/progress schemas and the shortcode `[cafcc_dashboard]`. That shortcode remains an alias for the new dashboard. The new verified database uses separate `cafcc_question_references` and `cafcc_student_progress` tables. **Old `cafcc_questions` and `cafcc_progress` tables, including question text and private notes, are preserved unchanged.**
+1. Review/create an edition with truthful applicability, source URL and edition/reprint month (`YYYY-MM`; leave unknown dates blank with a note).
+2. Create module/chapter/unit/topic/subtopic nodes in parent-first order. Parent, edition and subject must agree. Use **Official** only for an exact cited heading; use **Editorial** for your finer taxonomy. Position controls ordering. Publish the reviewed edition and parent before publishing a child.
+3. Add a source document with a stable key, edition, official title/URL, source type, attempt/context, issue period and MTP series when applicable. Verify and publish only after inspecting it.
+4. Add a stable question record, its primary source/subject/edition and optional primary chapter. Record short reference titles, not unlicensed question text. Add a separate **occurrence** for every appearance, with its document, page, question/subquestion number and verified marks where available.
+5. Add as many **question-topic mappings** as needed, including subtopics. IBS cases may additionally have several subject mappings and tags from relevant subject editions. Normal questions cannot silently cross editions/subjects.
+6. Add answers using either **Official Link** (URL and location, no copied text) or **Authored / Licensed** (solution text and clear authorship/reproduction-rights basis). Only verified published answers reach students. Rights evidence remains private to administrators; a link being publicly readable does not establish reproduction permission.
+7. Use Draft/Rejected to withdraw incorrect material. Records with connected data cannot be deleted through the old editor. Source URLs with recorded appearances are not silently reassigned: add a corrected source/occurrence and unpublish the incorrect one.
 
-An administrator notice identifies preserved prototype tables. Their contents are not automatically copied, published, or matched to new question IDs because they lack the required official source, syllabus and verification information. A reviewed legacy migration is a future task if those tables contain real data. Existing prototype progress will not appear in the new dashboard until such a mapping is implemented and reviewed.
+Families/comparisons are preparation for future human-reviewed repetition analysis. No percentage, automated equivalence or exam-frequency claim is calculated in this version.
 
-## Add the first reviewed reference
+### Existing Version 0.1 records
 
-Only an Administrator can do this. Use **CA Final Command Center → Record type**:
+Migration does not guess their editions or tags. They remain accessible with their existing progress as unclassified Version 0.1 references when no connected filters are selected.
 
-1. **Chapters:** choose one seeded subject, enter the real chapter title and exact syllabus version. Position controls explorer order.
-2. **Topics:** choose the chapter and enter a real topic title (optional for a question).
-3. **Documents:** enter the source title, source type (`exam`, `rtp`, `mtp`, `study_material`, `other`), actual exam attempt/context and matching syllabus version. For a source without a specific attempt, use a truthful description such as `Not attempt-specific`; do not guess an exam date.
-4. Add a direct official HTTPS ICAI resource URL. Review the actual source yourself before setting **Verification Status → Verified**. Accepted hosts are `icai.org`, `icai.nic.in` and their subdomains. Query strings, embedded credentials, fragments, custom ports, Google Drive and other hosts are rejected. This conservative policy may need a future allowlist change for other official resource hosts.
-5. **Questions:** choose the source document, chapter and optional topic, enter the actual question number and a short reference title. Initially save it as **Unverified / Draft**. After checking the official source, set **Verified / Published**.
+To connect one deliberately: add source metadata using its **existing Document ID**, then question metadata using its **existing Question ID** and the same primary document. The initial connection adds metadata without rewriting the old rows. Review the source, add verified occurrences and classification mappings, then publish. Connecting draft source metadata temporarily withdraws its questions until the source is reviewed, so do this deliberately on staging.
 
-A published question appears only while **both question and document are verified**, the source has an official URL, and the document/chapter syllabus versions match. Revoke verification or change the question to Draft to hide it. The plugin does not fetch URLs, check whether a URL returns a PDF, or verify academic accuracy automatically.
+The older `main` prototype's `cafcc_questions` / `cafcc_progress` tables, including notes, remain untouched and separate. No automatic conversion from that prototype is attempted.
 
-Existing dependent records block deletion or structural reassignment. Questions with student progress cannot be deleted; unpublish them instead. Revoking verification hides the reference and excludes it from the student summary while keeping saved progress in the database.
+## CSV import
 
-## Privacy, permissions and caching
+Download templates inside the manager or use [the five bundled templates](ca-final-command-center/templates). Keep their exact column order. UTF-8 CSV, comma-delimited, maximum **200 rows / 512 KB** per batch.
 
-- Master edits and approvals require both the `administrator` role and `manage_options` capability (or an authorized multisite super administrator). Editors, students and public visitors cannot write master records through REST or direct admin access.
-- Every plugin REST request requires a signed-in account, `read` capability and a valid WordPress REST nonce. Master writes additionally check administrator privileges inside the repository layer.
-- Progress writes accept only a status. The owner is always the authenticated WordPress user, never a supplied `user_id`.
-- Resource links are limited to approved official ICAI hosts. Do not put private or confidential links in record titles either.
-- The shortcode page sets WordPress no-cache signals and REST responses use `private, no-store`. **Exclude the dashboard page and `/wp-json/cafcc/*` (including `?rest_route=/cafcc/…`) from any Hostinger/CDN/LiteSpeed page cache. Never enable caching for logged-in users.** External caches can override application headers, so verify using two test accounts.
-- A WordPress nonce is CSRF protection, not a substitute for server permissions. Expired sessions/nonces require reloading the page.
-- Deactivation and deletion of plugin files do not erase academic records or progress. Database backups contain student progress; keep them private.
+- **Hierarchy:** editions/subject codes must already exist; use stable `node_key` / `parent_key` values, parent rows before children.
+- **Documents:** reference the edition key and supply the actual official source metadata.
+- **Occurrences:** reference document/edition keys. An unknown question key creates a new draft stable question using the supplied reference title. Existing question keys reuse that identity. Every appearance must have a unique location. Question/edition/source mismatches fail validation.
+- **Question-topic mappings:** use question and node keys; several rows can classify one question.
+- **Answer references:** use question and optional occurrence keys. Official-link rows must leave answer text empty; authored/licensed rows require a rights basis.
 
-## Development and validation
+Choose the file → **Validate & preview** → inspect the preview → **Import validated draft batch**. Preview validates relations and duplicates inside a transaction that is rolled back; no academic rows remain, though auto-increment ID gaps are normal. Commit revalidates and uses a lock; retrying the same token cannot duplicate a batch. Imports never approve themselves or overwrite existing stable keys.
 
-No build step is required to run the plugin. For contributors with Docker and Python:
+**Withdraw batch safely** removes it from student access while retaining every row and all progress. It also hides dependent resources where their source/edition/path is withdrawn. It is not a delete or a reversal of unrelated later administrator edits. Withdrawn records cannot be accidentally republished; use a corrected new batch. Preview tokens expire in one hour and belong to the administrator who created them. Safe imports require InnoDB; the plugin will not convert table engines automatically.
+
+## Security and deployment boundary
+
+Server-side administrator role **and** capability checks protect all master mutations and imports. Every plugin REST request requires a signed-in user, `read` capability and a valid WordPress REST nonce. Students cannot choose the owner of progress writes. Both API versions honor withdrawn source/question batches and send private/no-store headers. SQL values use prepared operations; text/enum/relationship validation and escaped/DOM text output prevent injection.
+
+Only direct HTTPS ICAI-host resource URLs are accepted, without credentials, query strings, fragments or custom ports. Google Drive URLs are rejected as sources/answers. No private files, credentials or unpublished answer text are exported to student endpoints. The plugin makes no external content-fetching requests.
+
+Deactivation retains all data. Restoring old plugin files alone is not a validated database downgrade: restore the matching **database and files backup** if you need to return to Version 0.1. See [migration report](docs/MIGRATION-0.2.md).
+
+## Requirements, tests and previews
+
+WordPress 6.6+, PHP 8.1+, InnoDB MySQL/MariaDB. Tested on WordPress 6.8.3, PHP 8.2.29, MariaDB 11.4. Network-wide activation remains unsupported; activate per site.
 
 ```sh
 bash tests/run-integration.sh
-node --check ca-final-command-center/assets/admin.js
-node --check ca-final-command-center/assets/student.js
+CAFCC_TEST_LEGACY=1 bash tests/run-integration.sh
+node --check ca-final-command-center/assets/explorer.js
+node --check ca-final-command-center/assets/manager.js
 python3 scripts/build.py
 ```
 
-Node is used **only for contributor/CI JavaScript syntax checks**, not for building or running anything on Hostinger. PHP syntax checks run inside the disposable WordPress container. Tests create their own isolated MariaDB/WordPress network, publish no host ports, and remove test containers and database volumes afterward. Test fixtures are explicitly marked TEST ONLY and are never included in the plugin ZIP.
+Node/Python/Docker are contributor/CI tools only; none is required on Hostinger. Optional local browser tests use Python Playwright and Chromium: run `CAFCC_PREVIEW=1 bash tests/run-integration.sh`, then `python3 tests/browser-smoke.py`. The optional preview binds only to loopback port 8092; remove its disposable containers/network afterward using the names in `work/preview-containers.txt`.
 
-See [architecture](docs/ARCHITECTURE.md), [test coverage and staging checklist](docs/TESTING.md), and [release notes](docs/CHANGELOG.md).
+See [validation results](docs/VALIDATION.md), [architecture](docs/ARCHITECTURE.md), [iPad-width preview](docs/previews/ipad-explorer.png), [phone-width preview](docs/previews/phone-explorer.png). Screenshots show real local WordPress/database behavior, including honest empty question states. They are Chromium viewport previews, not a claim of testing on actual iPad Safari or Hostinger.
 
-## Current limitations and next task
+## Remaining work
 
-Version 0.1.0 stores question **references**, not full exam papers, answer evaluation or licensed question text. There is no importer/exporter, PDF parsing, subscriptions, payments, student registration, study planner, historical analytics, audit log, automatic source verification or offline dashboard. No import endpoint exists for public users or students. The admin picker is intended for a small reviewed corpus (up to 10,000 records per entity); student results are paginated 20 per page.
+The sourced starter catalogue does not provide exhaustive detailed topics/subtopics, newer 2027 tax editions or attempt-specific statutory updates. Those need source review and separate editions/imports. There is no mass PDF ingestion, licensed-content acquisition, AI question generation, automatic answer/rights verification, complex analytics, subscriptions or payments. User privacy export/erasure, a full administrator audit log and broad theme/cache compatibility remain future work. The admin picker is intended for up to 10,000 records per collection; larger corpora need server-side picker search.
 
-**Next development task:** on private staging, curate and verify a small real question-reference set for one chapter, then complete the documented two-student acceptance test before expanding academic content.
-
-License: GPL-2.0-or-later, https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+License: GPL-2.0-or-later.

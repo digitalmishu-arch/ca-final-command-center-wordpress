@@ -11,8 +11,13 @@ cleanup() {
     docker network rm "$run_id" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
-# No published ports, no external access, no persistent database volumes.
-docker network create --internal "$run_id" >/dev/null
+port_args=()
+if [[ "${CAFCC_PREVIEW:-0}" == 1 ]]; then port_args=(-p 127.0.0.1:8092:80); fi
+# Default tests: internal network, no published ports and no persistent database volumes.
+# Optional previews bind only to loopback; they are never a hosting deployment.
+network_args=(--internal)
+if [[ "${CAFCC_PREVIEW:-0}" == 1 ]]; then network_args=(); fi
+docker network create "${network_args[@]}" "$run_id" >/dev/null
 docker run -d --name "$db_container" --network "$run_id" --network-alias db \
     -e MARIADB_ROOT_PASSWORD=cafcc-disposable-only -e MARIADB_DATABASE=cafcc_test \
     -e MARIADB_USER=cafcc -e MARIADB_PASSWORD=cafcc-disposable-only mariadb:11.4 >/dev/null
@@ -22,10 +27,10 @@ for ((i=0;i<60;i++)); do
     sleep 1
 done
 if [[ "$ready" != 1 ]]; then echo 'Test database failed to start.' >&2; exit 1; fi
-docker run -d --name "$wp_container" --network "$run_id" \
+docker run -d --name "$wp_container" --network "$run_id" "${port_args[@]}" \
     --mount "type=bind,src=$repo_path,dst=/repo,readonly" \
     -e WORDPRESS_DB_HOST=db -e WORDPRESS_DB_USER=cafcc -e WORDPRESS_DB_PASSWORD=cafcc-disposable-only \
-    -e WORDPRESS_DB_NAME=cafcc_test wordpress:6.8-php8.2-apache >/dev/null
+    -e WORDPRESS_DB_NAME=cafcc_test -e WORDPRESS_CONFIG_EXTRA="define('WP_HTTP_BLOCK_EXTERNAL', true);" wordpress:6.8-php8.2-apache >/dev/null
 ready=0
 for ((i=0;i<60;i++)); do
     if docker exec "$wp_container" test -f /var/www/html/wp-config.php; then ready=1; break; fi
@@ -40,4 +45,10 @@ docker exec "$wp_container" sh -c 'find /repo/ca-final-command-center /repo/test
 if ! docker exec -e CAFCC_TEST_LEGACY="${CAFCC_TEST_LEGACY:-0}" "$wp_container" php /repo/tests/integration.php; then
     docker exec "$wp_container" php -r 'require "/var/www/html/wp-load.php"; echo json_encode(array("active"=>get_option("active_plugins"),"loaded"=>class_exists("CAFCC_REST"),"namespaces"=>rest_get_server()->get_namespaces())),PHP_EOL;'
     exit 1
+fi
+
+if [[ "${CAFCC_PREVIEW:-0}" == 1 ]]; then
+    docker exec "$wp_container" php /repo/tests/preview.php
+    trap - EXIT
+    printf '%s\n' "$wp_container" "$db_container" "$run_id" > work/preview-containers.txt
 fi

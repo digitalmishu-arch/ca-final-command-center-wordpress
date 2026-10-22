@@ -1,89 +1,64 @@
-# Architecture — 0.1.0
+# Architecture — Version 0.2.0
 
-## Runtime and files
+Version 0.2 extends the complete [Version 0.1 foundation](ARCHITECTURE-0.1.md). The original repository/REST permissions, question identities and progress storage remain in use. No hosting runtime dependency was added.
 
-The plugin is pure PHP 8.1+, MySQL/MariaDB, vanilla browser JavaScript and CSS. WordPress supplies authentication, session nonces, capabilities and REST routing. There are no frontend packages, Composer dependencies, external service keys or network calls from the plugin.
+## Components
 
-| File | Responsibility |
+| Component | Responsibility |
 | --- | --- |
-| `ca-final-command-center/ca-final-command-center.php` | WordPress plugin header, activation and component bootstrap |
-| `includes/class-cafcc-db.php` | Whitelisted table names, versioned `dbDelta` schema setup, idempotent subject seeding |
-| `includes/class-cafcc-repository.php` | Master permission checks, record validation, relationships, queries and progress ownership |
-| `includes/class-cafcc-rest.php` | Explicit routes, authentication/nonces, bounded requests, response cache policy |
-| `includes/class-cafcc-admin.php` | Administrator menu and editor shell |
-| `includes/class-cafcc-frontend.php` | Student shortcode, no-cache signals and signed-in shell |
-| `assets/admin.js` | Record-type forms, approval fields, edit/delete operations and pagination |
-| `assets/student.js` | Student subject/chapter filters, progress status updates and simple summary |
-| `assets/app.css` | Scoped responsive styles and touch-sized controls |
-| `tests/` | Disposable real WordPress/MariaDB integration tests and PHP syntax checks |
-| `scripts/build.py` | Deterministic ZIP packaging with one top-level plugin directory |
-| `.github/workflows/build-plugin.yml` | Isolated tests, syntax validation and downloadable ZIP artifact |
-
-## Data relationships
-
-Every custom table begins with the current WordPress site's `$wpdb->prefix . 'cafcc_'`. Entities `questions` and `progress` map to suffixes `question_references` and `student_progress`; the other four entities use their entity names. The prototype's incompatible `cafcc_questions` and `cafcc_progress` tables are preserved without modification.
+| `class-cafcc-db.php` | Schema version gate and original six table definitions; invokes additive schema 2 |
+| `class-cafcc-academic-db.php` | Twelve new tables; idempotent sourced catalogue preparation |
+| `class-cafcc-academic.php` | Typed records, enums, validation, parent/edition relationships, authorization and transactional writes |
+| `class-cafcc-import.php` | Strict CSV templates, transactional preview, owner-bound commit plans, revalidation/locking and soft withdrawal |
+| `class-cafcc-explorer.php` | Validated filter paths, published catalogues, many-to-many matching, occurrence/source filtering, answer rights and private progress joins |
+| `class-cafcc-academic-ui.php` | Administrator manager, first-party REST v2 routes, bulk sourced-heading review and student shell |
+| `assets/explorer.js` / `explorer.css` | Responsive student filters/cards, own progress and answer panels; scoped navy/teal/purple styling |
+| `assets/manager.js` | Resource/taxonomy forms, source review and CSV file preview/commit/withdrawal |
+| Original repository/REST/admin | Version 0.1 records, permissions and progress APIs; new visibility guard prevents withdrawn-batch bypass |
 
 ```mermaid
 erDiagram
-    subjects ||--o{ chapters : contains
-    chapters ||--o{ topics : contains
-    chapters ||--o{ questions : indexes
-    topics o|--o{ questions : optionally_indexes
-    documents ||--o{ questions : references
-    questions ||--o{ progress : tracks
-    wp_users ||--o{ progress : owns
+    subjects ||--o{ editions : has
+    editions ||--o{ taxonomy : versions
+    taxonomy o|--o{ taxonomy : parents
+    questions ||--o| question_meta : identity
+    questions ||--o{ question_tags : classifies
+    taxonomy ||--o{ question_tags : tags
+    questions ||--o{ question_subjects : IBS_subjects
+    documents ||--o| document_meta : source_metadata
+    questions ||--o{ occurrences : appears
+    documents ||--o{ occurrences : contains
+    questions ||--o{ answers : explains
+    questions ||--o{ student_progress : tracks
+    import_batches o|--o{ occurrences : appends
 ```
 
-- Subjects contain a unique code and display name. Initial codes: `FR`, `AFM`, `AUDIT`, `DT`, `IDT`, `IBS`.
-- Chapters store subject, title, syllabus version and order position.
-- Topics belong to one chapter. A question's topic, if present, must belong to its selected chapter.
-- Documents store source type, actual exam-attempt/context text, syllabus version, official URL and verification status.
-- Questions reference a document/chapter/topic and store a question number, short title, verification status and Draft/Published status. Syllabus version, exam attempt, source type and official URL are normalized through their source/chapter relationships; the explorer joins them for display.
-- Progress has a unique `(user_id, question_id)` index, status and UTC update timestamp. Missing rows mean Not Started. Writes use an atomic upsert scoped to the current user and a currently visible question.
+`taxonomy.node_type` represents module, chapter, unit, topic and subtopic entities in one typed adjacency table. Every node has a subject/edition and a validated parent type. This supports missing module/unit levels without inventing official headings. Structural moves are refused; a separate node and historical mapping preserve identity. Ordering and corrected titles can be edited in place. Many-to-many question tags use node IDs and allow several detailed classifications per question.
 
-WordPress `dbDelta` does not manage foreign keys here. Relationship validation, restricted deletion and structural-edit checks live in the repository. Administrative writes should be sequential in this initial version; concurrent master edits are not serialized. Use a database backup before bulk administration. User deletion/privacy export/erasure automation is a future task; deleted-user progress currently remains until an administrator handles data retention outside this version.
+Existing question/source tables retain their IDs and fields. New metadata is linked by unique `question_id` / `document_id`. New questions use the original question/progress storage and a primary chapter reference; finer/cross-subject classifications live in relation tables. Existing unclassified questions remain available globally rather than being assigned an inferred syllabus. The initial explicit classification operation adds metadata without rewriting their old rows.
 
-## Schema migration lifecycle
+## REST v2
 
-Plugin version `0.1.0` is separate from schema version `1` in `cafcc_db_version`.
+Namespace `/cafcc/v2`; both pretty and plain WordPress REST URLs are supported by the browser request builders. All routes require the original permission callback: authenticated user, `read`, matching REST nonce and ready schema. Administrator routes additionally require the administrator role and `manage_options`; repository writes repeat the authorization check.
 
-- Activation and plugin startup call migration when the stored schema differs.
-- Migration from an absent/version-0 schema creates or reconciles the six tables with `dbDelta`, checks expected tables/columns and inserts the six missing subject codes with `INSERT IGNORE`.
-- Only successful setup advances the option. Repeating a partial migration does not duplicate subjects or erase existing records.
-- Future schema changes must increase `CAFCC_DB::VERSION`, add any required data transformation, and add migration regression tests. A stored newer schema is refused rather than downgraded; REST access fails closed with 503 until compatible code/setup is restored.
-- Network-wide activation is rejected. Per-site activation uses that site's prefix.
-- The earlier repository prototype has no verified source/syllabus metadata. Its tables and private notes remain untouched, an administrator notice explains the separation, and `[cafcc_dashboard]` aliases the new shortcode. No automatic legacy publication or progress-ID mapping is attempted. A reviewed legacy migration remains a future task when real prototype records exist.
-- There is no destructive deactivation/uninstall routine. Removing plugin files retains academic tables and progress.
+- `GET /catalog`, `/questions`, `/summary`: validated `subject_id`, `edition_id`, `chapter_id`, `unit_id`, `topic_id`, `subtopic_id`, `source_type`, `exam_attempt`, `search`, `page`.
+- `GET /answers/{question_id}`: only reviewed published solutions/links; private rights evidence is not returned.
+- `GET/POST /admin/{collection}`; `PATCH /admin/{collection}/{id}`: typed master records. No destructive v2 DELETE endpoint.
+- `POST /admin/review-hierarchy/{edition_id}`: explicit source-review confirmation; approves bundled official headings, not editorial tags or imported research.
+- `POST /admin/import/preview`, `/admin/import/commit`, `/admin/import/rollback/{batch_id}`; `GET /admin/import/batches`.
 
-## Security boundary
+Collections: editions, taxonomy, documents, questions, occurrences, tags, subject_tags, answers, families, comparisons, edition_mappings. Both admin lists use 100-row pagination; the manager assembles up to 10,000 records per picker. Student questions use 20-row pages and existential tag matching to avoid duplicates.
 
-All master mutation routes require a current WordPress user with `read`, a valid `wp_rest` nonce in `X-WP-Nonce`, and administrator authorization. Repository save/delete methods repeat the administrator check. An Editor with a separately granted `manage_options` capability still cannot edit master records.
+Progress continues through `PUT /cafcc/v1/progress/{question_id}`. Its owner is always the current WordPress user; no alternate progress owner field exists. Both namespaces send private/no-store headers.
 
-All student read/write routes require sign-in, `read`, and a valid REST nonce. They do not accept an owner ID. Summary/explorer SQL joins progress against `get_current_user_id()`; writes obtain the same value on the server. The progress body must contain only `status`. Public users cannot read these student routes. There are no import routes or public write endpoints.
+## Integrity and publication
 
-Input handling uses strict field allowlists, bounded request sizes (16 KB), bounded page numbers, scalar/type checks, positive ID validation, text sanitization, enum checks and relationship validation. SQL values use `$wpdb->prepare`, `$wpdb->insert`, `$wpdb->update` and `$wpdb->delete`; table/column identifiers come only from internal allowlists. Browser-rendered values use `textContent` and WordPress output uses context-appropriate escaping.
+Filter IDs are validated as one real hierarchy path before querying. The deepest selected node matches its reviewed descendant tags; it is not combined with unrelated independent dropdown IDs. Source/attempt conditions must match the same occurrence. Verified marks are separate from unknown marks. Non-IBS questions cannot silently cross editions; IBS mappings may explicitly reference relevant subject editions.
 
-Official resource links accept only direct HTTPS `icai.org`/`icai.nic.in` URLs and their subdomains, without credentials, query, fragment or port. Nothing is fetched or embedded. This prevents publishing private Google Drive URLs as resource links; it does not establish academic accuracy or guarantee a source is reachable.
+A connected question needs a published verified source occurrence and edition to appear in v2. Source/question review is also checked by the original visibility logic. Batch status is part of visibility in both API versions. Taxonomy paths require reviewed published ancestors. Answers tied to withdrawn occurrences are withheld; official-link mode contains no copied solution text. Authored/licensed text needs a recorded rights basis plus explicit publication.
 
-Question visibility is reused for the explorer, summary, chapter catalog and progress writes. Both question and document must be verified, question must be published, source must have an official URL, and syllabus versions must match. Revoking source verification hides its references without deleting progress.
+All identifiers come from internal table/field maps; SQL values use prepared operations. Strings, relations, stable keys, enum values, bounds and request sizes are checked. Browser output uses DOM text rather than injected HTML. Expected duplicate SQL errors are suppressed from response/log output and returned as safe conflicts. Source URLs use the original conservative direct-HTTPS ICAI-host allowlist.
 
-## REST surface
+CSV imports are append-only, transactionally previewed/revalidated and serialized by a site-specific MySQL advisory lock. Commit tokens are random, short-lived and bound to their administrator; retries return the original batch. A late conflict rolls back all rows in the batch. Withdrawal retains IDs and progress and refuses accidental republication. It is not a full audit/history or data-deletion system.
 
-Base namespace: `/wp-json/cafcc/v1` (WordPress also supports `?rest_route=/cafcc/v1/…`). All routes require a nonce, including reads. These endpoints are for the first-party WordPress UI, not a nonce-free application-password integration.
-
-| Method and route | Access and behavior |
-| --- | --- |
-| `GET /admin/{entity}?page=1` | Administrator; 100 master records per page |
-| `POST /admin/{entity}` | Administrator; create one validated JSON record |
-| `PATCH /admin/{entity}/{id}` | Administrator; edit allowed fields and/or approve/publish |
-| `DELETE /admin/{entity}/{id}` | Administrator; reject when dependent records/progress exist |
-| `GET /catalog` | Signed-in user; subjects and chapters with visible references |
-| `GET /questions?subject_id=…&chapter_id=…&page=1` | Signed-in user; visible references, own status, 20 per page |
-| `GET /summary` | Signed-in user; own counts across visible questions |
-| `PUT /progress/{question_id}` | Signed-in user; body `{ "status": "needs_revision" }` |
-
-`{entity}` is exactly one of `subjects`, `chapters`, `topics`, `documents`, `questions`. Master list metadata includes `total` and `per_page`. Expected errors include 400 validation, 401 unauthenticated, 403 denied/expired nonce, 404 unavailable record, 409 dependency/duplicate conflict, 413 oversized body and 503 incomplete/incompatible schema.
-
-## Deployment boundary
-
-GitHub Actions tests and packages code; it has read-only repository permissions and no Hostinger credentials/deployment action. Nothing automatically installs, merges or publishes. The plugin adds no public page. Shortcode content is generated in the browser from private REST data; exclude its page and API paths from external caches. Hosting-level staging privacy and backup restoration must be checked in the target environment before real data is added.
+See [migration report](MIGRATION-0.2.md), [sources](SOURCES.md), [testing](TESTING.md) and [validation](VALIDATION.md) for evidence and limits.
