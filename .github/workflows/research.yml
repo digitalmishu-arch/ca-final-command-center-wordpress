@@ -1,0 +1,18 @@
+name: Private research tooling checks (synthetic fixtures only)
+on:
+  push:
+    branches: ['feat/**', main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metadata-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test metadata extraction, privacy and CSV validation
+        run: python3 -m unittest discover -s tests -p 'test_research.py' -v
+      - name: Check Python syntax
+        run: python3 -m py_compile research/rtp_pipeline.py
+      # Never download Drive PDFs or upload research outputs on a public runner.

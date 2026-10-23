@@ -3,3 +3,5 @@
 *.log
 .DS_Store
 __pycache__/
+*.pdf
+/research/private/
