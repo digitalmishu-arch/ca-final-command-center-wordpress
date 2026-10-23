@@ -111,3 +111,6 @@ See [validation results](docs/VALIDATION.md), [architecture](docs/ARCHITECTURE.m
 The sourced starter catalogue does not provide exhaustive detailed topics/subtopics, newer 2027 tax editions or attempt-specific statutory updates. Those need source review and separate editions/imports. There is no mass PDF ingestion, licensed-content acquisition, AI question generation, automatic answer/rights verification, complex analytics, subscriptions or payments. User privacy export/erasure, a full administrator audit log and broad theme/cache compatibility remain future work. The admin picker is intended for up to 10,000 records per collection; larger corpora need server-side picker search.
 
 License: GPL-2.0-or-later.
+## Private RTP research pipeline
+
+The offline [RTP research proof of concept](docs/RESEARCH-PIPELINE.md) prepares metadata-only Draft/Needs Review CSVs for the existing V0.2 importer. It preserves the WordPress foundation and requires no plugin update or Hostinger action. Actual PDFs/research outputs stay private; GitHub contains tools, documentation and synthetic tests only.

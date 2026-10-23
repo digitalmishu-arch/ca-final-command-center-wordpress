@@ -216,4 +216,6 @@ check(call_api('GET', 'summary')->get_status() === 503, 'Incompatible database v
 check(is_wp_error(CAFCC_DB::migrate()), 'Database downgrade is refused');
 update_option('cafcc_db_version', CAFCC_DB::VERSION);
 require __DIR__ . "/v02.php";
+require __DIR__ . "/research-import.php";
+require __DIR__ . "/validate-research-package.php";
 echo "\n$count integration assertions passed on WordPress " . get_bloginfo('version') . ', PHP ' . PHP_VERSION . ".\n";

@@ -42,7 +42,7 @@ if [[ "$ready" != 1 ]]; then echo 'Test WordPress failed to start.' >&2; exit 1;
 docker cp "$repo_path/ca-final-command-center" "$wp_container:/var/www/html/wp-content/plugins/ca-final-command-center"
 docker exec "$wp_container" chmod -R a+rX /var/www/html/wp-content/plugins/ca-final-command-center
 docker exec "$wp_container" sh -c 'find /repo/ca-final-command-center /repo/tests -name "*.php" -print0 | xargs -0 -n 1 php -l'
-if ! docker exec -e CAFCC_TEST_LEGACY="${CAFCC_TEST_LEGACY:-0}" "$wp_container" php /repo/tests/integration.php; then
+if ! docker exec -e CAFCC_TEST_LEGACY="${CAFCC_TEST_LEGACY:-0}" -e CAFCC_RESEARCH_PACKAGE="${CAFCC_RESEARCH_PACKAGE:-}" "$wp_container" php /repo/tests/integration.php; then
     docker exec "$wp_container" php -r 'require "/var/www/html/wp-load.php"; echo json_encode(array("active"=>get_option("active_plugins"),"loaded"=>class_exists("CAFCC_REST"),"namespaces"=>rest_get_server()->get_namespaces())),PHP_EOL;'
     exit 1
 fi

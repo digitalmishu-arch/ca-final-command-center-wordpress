@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — private RTP research tooling
+
+- Add offline metadata extraction, private side-by-side validation, source/occurrence duplicate checks and V0.2 CSV preflight.
+- Add research/importer regression tests and a synthetic-only GitHub Actions workflow.
+- Preserve the complete Version 0.2.0 plugin, schema, hierarchy, importer and student data; no hosting migration or deployment.
+
 ## 0.2.0 — 22 October 2026
 
 Extends PR #1 on a separate branch. Adds schema 2 without rewriting old records; six sourced editions and 180 draft hierarchy entries with official/editorial provenance; connected dependent student filters, search and source/attempt filtering; multiple question-topic/subtopic and IBS subject tags; unique appearances and verified marks; stable question metadata, families/comparisons and historical mappings; authored/licensed solutions or link-only official answer references; administrator manager and five CSV preview/import/withdrawal workflows. Includes plain-permalink URL handling, migration/import/relationship/access/filter/browser checks, mobile previews and a versioned GitHub Actions ZIP artifact. No merge, hosting access, payment connection or deployment.
