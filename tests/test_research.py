@@ -24,6 +24,11 @@ def fixture():
 
 
 class ResearchTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Fresh GitHub checkouts intentionally contain no ignored private work/.
+        (ROOT/'work').mkdir(mode=0o700, exist_ok=True)
+
     def test_official_urls(self):
         for url in ['http://icai.org/a','https://icai.org.evil.test/a','https://drive.google.com/a','https://www.icai.org/a?token=secret','https://a@icai.org/a','https://icai.org:443/a']:
             self.assertFalse(p.official_url(url))
