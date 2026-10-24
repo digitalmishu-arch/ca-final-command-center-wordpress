@@ -1,0 +1,16 @@
+{
+  "icai-bos-single-column@2": {
+    "id": "icai-bos-single-column", "version": 2,
+    "body_left": 108, "left_tolerance": 9,
+    "header_y": 140, "footer_fraction": 0.84,
+    "heading_rgb": [144, 87, 30], "colour_tolerance": 45,
+    "status": "six-RTP pilot only; needs owner boundary benchmark"
+  },
+  "generic-question-paper@1": {
+    "id": "generic-question-paper", "version": 1,
+    "body_left": 72, "left_tolerance": 10,
+    "header_y": 40, "footer_fraction": 0.94,
+    "heading_rgb": [144, 87, 30], "colour_tolerance": 45,
+    "status": "synthetic MTP/exam tests only; actual source review required"
+  }
+}

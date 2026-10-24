@@ -97,11 +97,9 @@ final class CAFCC_Import {
         if (!CAFCC_Repository::admin_allowed()) { return CAFCC_Repository::error('Administrator access is required.',403); }
         $rows=self::parse($type,$csv); if (is_wp_error($rows)) { return $rows; }
         $safe=self::transactional(); if (is_wp_error($safe)) { return $safe; }
-        $wpdb->query('START TRANSACTION');
-        try { $manifest=self::apply($type,$rows,null); }
-        catch (Throwable $e) { $manifest=CAFCC_Repository::error('CSV validation failed; no records committed.'); }
-        $wpdb->query('ROLLBACK'); CAFCC_Academic::reset_cache();
-        if (is_wp_error($manifest)) { return $manifest; }
+        $probe=CAFCC_Academic::transaction(function()use($type,$rows){$m=self::apply($type,$rows,null);return is_wp_error($m)?$m:new WP_Error('cafcc_import_preview_rollback','Validated without committing',array('manifest'=>$m));});
+        if($probe->get_error_code()!=='cafcc_import_preview_rollback')return $probe;
+        $manifest=$probe->get_error_data()['manifest'];
         $token=wp_generate_uuid4();
         set_transient('cafcc_import_'.$token,array('owner_id'=>get_current_user_id(),'type'=>$type,'csv'=>$csv,'hash'=>hash('sha256',$csv),'batch_id'=>null),HOUR_IN_SECONDS);
         return array('token'=>$token,'type'=>$type,'row_count'=>count($rows),'record_count'=>count($manifest),'review_status'=>'needs_review',

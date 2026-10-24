@@ -149,7 +149,8 @@ final class CAFCC_Repository {
         return $data;
     }
 
-    public static function save($entity, $input, $id = 0) {
+    public static function save($entity, $input, $id = 0,$inside_transaction=false) {
+        if(!$inside_transaction&&class_exists('CAFCC_Bank_DB')){if(is_wp_error($e=CAFCC_Bank_DB::transactional()))return $e;return CAFCC_Academic::transaction(function()use($entity,$input,$id){return self::save($entity,$input,$id,true);});}
         global $wpdb;
         if (!self::admin_allowed()) {
             return self::error('Administrator access is required.', 403);
@@ -157,7 +158,7 @@ final class CAFCC_Repository {
         if (!in_array($entity, self::entities(), true) || !is_array($input)) {
             return self::error('Invalid master record.');
         }
-        $old = $id ? self::get($entity, $id) : null;
+        $old = $id ? self::get($entity, $id) : null;$audit_before=$old;
         if ($id && !$old) {
             return self::error('Record not found.', 404);
         }
@@ -176,6 +177,7 @@ final class CAFCC_Repository {
                 return self::error('This record has dependent records. Create a separate record for structural changes.', 409);
             }
         }
+        foreach($data as $value)if(is_string($value)&&class_exists('CAFCC_Bank_DB')&&CAFCC_Bank_DB::private_reference($value))return self::error('Private Drive references are not public academic records.');
         $table = CAFCC_DB::table($entity);
         $result = $id ? $wpdb->update($table, $data, array('id' => $id)) : $wpdb->insert($table, $data);
         if (false === $result) {
@@ -183,7 +185,8 @@ final class CAFCC_Repository {
         }
         $saved_id=$id?:$wpdb->insert_id;
         if($old && class_exists('CAFCC_Studio'))CAFCC_Studio::invalidate($entity,$saved_id);
-        return self::get($entity,$saved_id);
+        $saved=self::get($entity,$saved_id);if(class_exists('CAFCC_Bank_DB')&&!CAFCC_Bank_DB::audit_master('legacy_'.$entity,$saved_id,$audit_before,$saved))return self::error('Cannot retain master history.',500);
+        return $saved;
     }
 
     private static function referenced($entity, $id) {
@@ -258,6 +261,7 @@ final class CAFCC_Repository {
         if (!is_user_logged_in() || !current_user_can('read')) {
             return self::error('Sign in to save progress.', 401);
         }
+        if(class_exists('CAFCC_Access')&&!CAFCC_Access::eligible())return self::error('An active approved membership is required.',403);
         if (!in_array($status, self::STATUSES, true)) {
             return self::error('Invalid progress status.');
         }

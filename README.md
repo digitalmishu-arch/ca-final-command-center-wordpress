@@ -1,3 +1,15 @@
+# CA Final Command Center — Version 0.4.0
+
+WordPress/PHP/MySQL question-bank foundation, continuing v0.3 PR #5 and integrating the corrected offline research engine from PR #4/#8. No deployment, live payment or automatic academic publication.
+
+Read [the original v0.3 gap analysis](docs/v04/GAP-ANALYSIS.md), [iPad installation and owner review](docs/v04/IPAD-INSTALL-AND-REVIEW.md), [migration report](docs/v04/MIGRATION-REPORT.md), [Review Studio / Excel guide](docs/v04/REVIEW-STUDIO.md), [architecture and unfinished work](docs/v04/ARCHITECTURE.md), and [actual research coverage](docs/RESEARCH-V04.md).
+
+Independent academic/source/attempt search, occurrence-specific audited approvals, private Excel round trip, rights-controlled full text and deliberate Show Answer, WordPress email verification/manual access, real source directory and navigation are implemented. Real corpus approval is unfinished: only six previously authorised PDFs were processed into 139 draft parent/subpart candidates; the other 417 catalogue files await private extraction/storage rights confirmation. The ZIP contains no real exam prose or approved questions.
+
+The test suite uses authored synthetic content only. `bash tests/run-integration.sh`, `CAFCC_TEST_LEGACY=1 bash tests/run-integration.sh`, `bash tests/run-browser.sh`, and `python3 -m unittest discover -s tests -p 'test_*.py'` exercise the release in disposable environments. `python3 scripts/build.py` creates the installable code-only ZIP. Hostinger needs no Node/Python runtime.
+
+The following retained documentation describes earlier foundations; v0.4 access/review gates supersede any earlier publication assumptions.
+
 # CA Final Command Center — WordPress plugin 0.3.0
 
 Version 0.3 adds rights-reviewed full-text practice, deliberately fetched answers, private student notes/bookmarks and a colourful responsive interface on the tested V0.2 foundation. [Exact iPad staging instructions and content-rights workflow](docs/PRACTICE-0.3.md), [migration report](docs/MIGRATION-0.3.md), and [validation](docs/VALIDATION-0.3.md). The offline research accuracy fixes are a separate pull request. No research text is copied into WordPress and no questions are seeded by this ZIP.

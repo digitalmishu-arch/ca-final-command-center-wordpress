@@ -1,0 +1,37 @@
+name: Private research tooling checks (synthetic fixtures only)
+on:
+  push:
+    branches: ['feat/**', main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metadata-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install offline layout extraction dependency
+        run: python3 -m pip install -r research/requirements.txt
+      - name: Test metadata extraction, privacy and CSV validation
+        run: python3 -m unittest discover -s tests -p 'test_research.py' -v
+      - name: Layout, source identity and owner-correction regression tests
+        run: python3 -m unittest discover -s tests -p 'test_layout.py' -v
+      - name: Resumable inventory and metadata-only bridge tests
+        run: python3 -m unittest discover -s tests -p 'test_inventory.py' -v
+      - name: Source-derived taxonomy proposal guards
+        run: python3 -m unittest discover -s tests -p 'test_taxonomy_proposals.py' -v
+      - name: Check Python syntax
+        run: python3 -m compileall -q research
+      - name: Build public research CODE artifact
+        run: python3 scripts/build-research.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-tools-v04-code-only
+          path: dist/research-tools-v04.zip
+          retention-days: 30
+          if-no-files-found: error
+      # Never download Drive PDFs or upload research outputs on a public runner.

@@ -48,6 +48,10 @@ final class CAFCC_Academic_DB {
                 edition_id bigint(20) unsigned NOT NULL,
                 issue_period varchar(80) NOT NULL DEFAULT '',
                 mtp_series varchar(40) NOT NULL DEFAULT '',
+                source_sha256 varchar(64) NOT NULL DEFAULT '',
+                source_revision varchar(190) NOT NULL DEFAULT '',
+                scheme varchar(190) NOT NULL DEFAULT '',
+                law_context varchar(2000) NOT NULL DEFAULT '',
                 $review,
                 PRIMARY KEY  (id),
                 UNIQUE KEY document_id (document_id),
@@ -72,6 +76,7 @@ final class CAFCC_Academic_DB {
                 page_reference varchar(80) NOT NULL DEFAULT '',
                 question_number varchar(40) NOT NULL,
                 subquestion_number varchar(40) NOT NULL DEFAULT '',
+                document_section varchar(120) NOT NULL DEFAULT '',
                 marks decimal(6,2) DEFAULT NULL,
                 marks_verified tinyint(1) NOT NULL DEFAULT 0,
                 question_type varchar(24) NOT NULL DEFAULT 'unknown',
@@ -148,9 +153,9 @@ final class CAFCC_Academic_DB {
         return self::seed_catalogue();
     }
 
-    public static function seed_catalogue() {
+    public static function seed_catalogue($path=null) {
         global $wpdb;
-        $bundle=json_decode(file_get_contents(dirname(__DIR__) . "/data/syllabus-catalogue.json"),true);
+        $bundle=json_decode(file_get_contents($path?:dirname(__DIR__) . "/data/syllabus-catalogue.json"),true);
         if (!$bundle || empty($bundle["editions"]) || empty($bundle["nodes"])) { return new WP_Error("cafcc_catalogue", "The bundled source catalogue is unavailable."); }
         $subjects=CAFCC_DB::table("subjects"); $editions=CAFCC_DB::table("editions"); $nodes=CAFCC_DB::table("taxonomy");
         foreach ($bundle["editions"] as $row) {
