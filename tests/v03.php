@@ -10,12 +10,12 @@ function v3($method,$path,$body=null,$nonce=true){
 function practice_save_test($data,$id=0){
     $r=v3($id?'PATCH':'POST','admin/practice'.($id?'/'.$id:''),$data);
     if(200!==$r->get_status()){throw new RuntimeException('Practice save failed: '.wp_json_encode($r->get_data()));}
-    return $r->get_data();
+    baseline_review_fixture((int)$r->get_data()['question_id']);return $r->get_data();
 }
 function practice_approve_test($row){
     $r=v3('POST','admin/practice/'.$row['id'].'/approve',array('expected_revision'=>$row['revision'],'rights_confirmed'=>true));
     if(200!==$r->get_status()){throw new RuntimeException('Practice approval failed: '.wp_json_encode($r->get_data()));}
-    return $r->get_data();
+    baseline_review_fixture((int)$r->get_data()['question_id']);return $r->get_data();
 }
 wp_set_current_user($admin);$pub=array('review_status'=>'verified','publication_status'=>'published');
 $v3doc=record2('documents',array_merge(array('document_key'=>'TEST-V03-DOC','edition_id'=>$fr['id'],'title'=>'TEST ONLY original practice fixture — not an ICAI question','source_type'=>'other','exam_attempt'=>'TEST ONLY authored demo, no exam attempt','official_url'=>'https://www.icai.org/test-only-v03.pdf'),$pub));

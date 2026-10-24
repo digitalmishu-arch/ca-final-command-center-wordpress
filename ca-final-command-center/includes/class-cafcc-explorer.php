@@ -5,12 +5,13 @@ final class CAFCC_Explorer {
     /** Applied to v1 reads/writes too: withdrawing new sources/batches cannot leak through old routes. */
     public static function visibility_guard() {
         $dm=CAFCC_DB::table('document_meta'); $qm=CAFCC_DB::table('question_meta');
-        return " AND NOT EXISTS (SELECT 1 FROM $dm vdm WHERE vdm.document_id=d.id AND NOT (".CAFCC_Academic::published('vdm')."))
+        return (class_exists('CAFCC_Studio')?CAFCC_Studio::question_guard():'')." AND NOT EXISTS (SELECT 1 FROM $dm vdm WHERE vdm.document_id=d.id AND NOT (".CAFCC_Academic::published('vdm')."))
             AND NOT EXISTS (SELECT 1 FROM $qm vqm WHERE vqm.question_id=q.id AND NOT (".CAFCC_Academic::active('vqm')."))";
     }
 
     public static function has_connections($kind,$id) {
         global $wpdb;
+        if('questions'===$kind && class_exists('CAFCC_Studio')){ $rt=CAFCC_Studio::table(); if($wpdb->get_var($wpdb->prepare("SELECT id FROM $rt WHERE question_id=%d LIMIT 1",$id)))return true; }
         if('questions'===$kind && class_exists('CAFCC_Practice')){
             foreach(array('content','notebook') as $kind3){$t=CAFCC_Practice::table($kind3);if($wpdb->get_var($wpdb->prepare("SELECT id FROM $t WHERE question_id=%d LIMIT 1",$id))){return true;}}
         }
@@ -216,6 +217,10 @@ final class CAFCC_Explorer {
     }
 
     public static function answers($id) {
+        return class_exists('CAFCC_Studio')?CAFCC_Studio::answers($id):self::legacy_answers($id);
+    }
+
+    public static function legacy_answers($id) {
         global $wpdb;
         $q=CAFCC_DB::table('questions'); $from=CAFCC_Repository::visible_from(); $where=CAFCC_Repository::visible_where();
         if (!CAFCC_Practice::visible_question($id)) { return CAFCC_Repository::error('Published question not found.',404); }

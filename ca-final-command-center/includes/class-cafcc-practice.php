@@ -83,7 +83,7 @@ final class CAFCC_Practice {
         global $wpdb;$t=self::table('content');
         if (!in_array($kind,array('question','answer'),true) || !self::visible_question($id)) {return null;}
         $row=$wpdb->get_row($wpdb->prepare("SELECT pc.* FROM $t pc WHERE pc.question_id=%d AND pc.content_kind=%s AND ".self::permitted_sql('pc'),$id,$kind),ARRAY_A);
-        if (!$row) {return null;}
+        if (!$row || (class_exists('CAFCC_Studio')&&!CAFCC_Studio::content_allowed($id,$kind))) {return null;}
         return array('body_html'=>self::html($row['body_html']),'mcq_options'=>'question'===$kind?json_decode($row['options_json'],true):array(),
             'author_name'=>$row['author_name'],'source_location'=>$row['source_location'],'rights_label'=>'original'===$row['rights_type']?'Independently authored':'Licensed content');
     }

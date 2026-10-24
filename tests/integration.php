@@ -48,6 +48,9 @@ CAFCC_Frontend::init();
 CAFCC_Academic_UI::init();
 CAFCC_Practice::init();
 CAFCC_Facets::init();
+CAFCC_Studio::init();
+CAFCC_Review_XLSX::init();
+require __DIR__ . "/v04-baseline-fixtures.php";
 $server = rest_get_server();
 $count = 0;
 function check($condition, $label) {
@@ -68,6 +71,7 @@ function call_api($method, $path, $data = null, $nonce = true) {
 function create_record($entity, $data) {
     $response = call_api('POST', 'admin/' . $entity, $data);
     if ($response->get_status() !== 200) { throw new RuntimeException($entity . ': ' . wp_json_encode($response->get_data())); }
+    baseline_after_record($entity,$response->get_data());
     return $response->get_data();
 }
 function http_api($method, $path, $body = null, $user_id = 0, $nonce = true, $version = "v1") {
@@ -220,4 +224,5 @@ update_option('cafcc_db_version', CAFCC_DB::VERSION);
 require __DIR__ . "/v02.php";
 require __DIR__ . "/v03.php";
 require __DIR__ . "/v04-facets.php";
+require __DIR__ . "/v04-studio.php";
 echo "\n$count integration assertions passed on WordPress " . get_bloginfo('version') . ', PHP ' . PHP_VERSION . ".\n";

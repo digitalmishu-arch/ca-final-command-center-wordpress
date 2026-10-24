@@ -220,18 +220,18 @@ final class CAFCC_Academic {
         return !$node_id;
     }
 
+    private static $transaction_depth=0;
     public static function transaction($callback) {
-        global $wpdb;
-        $wpdb->query('START TRANSACTION');
+        global $wpdb;$depth=self::$transaction_depth++;$savepoint='cafcc_nested_'.$depth;
+        $begun=$wpdb->query($depth?'SAVEPOINT '.$savepoint:'START TRANSACTION');
         try {
+            if(false===$begun)return CAFCC_Repository::error('Cannot start academic transaction.',500);
             $result=$callback();
-            if (is_wp_error($result)) { $wpdb->query('ROLLBACK'); self::reset_cache(); return $result; }
-            if (false===$wpdb->query('COMMIT')) { $wpdb->query('ROLLBACK'); self::reset_cache(); return CAFCC_Repository::error('The database transaction failed.',500); }
+            if(is_wp_error($result)){$wpdb->query($depth?'ROLLBACK TO SAVEPOINT '.$savepoint:'ROLLBACK');self::reset_cache();return $result;}
+            if(false===$wpdb->query($depth?'RELEASE SAVEPOINT '.$savepoint:'COMMIT')){$wpdb->query($depth?'ROLLBACK TO SAVEPOINT '.$savepoint:'ROLLBACK');self::reset_cache();return CAFCC_Repository::error('The database transaction failed.',500);}
             return $result;
-        } catch (Throwable $e) {
-            $wpdb->query('ROLLBACK'); self::reset_cache();
-            return CAFCC_Repository::error('The academic operation failed; no batch was committed.',500);
-        }
+        }catch(Throwable $e){$wpdb->query($depth?'ROLLBACK TO SAVEPOINT '.$savepoint:'ROLLBACK');self::reset_cache();return CAFCC_Repository::error('The academic operation failed; no batch was committed.',500);}
+        finally{self::$transaction_depth--;}
     }
 
     public static function save($kind,$input,$id=0,$batch_id=null,$inside_transaction=false) {
@@ -310,6 +310,7 @@ final class CAFCC_Academic {
             self::reset_cache();
             $record_id=in_array($kind,array('documents','questions'),true)?$id:($id?:$wpdb->insert_id);
             if ('taxonomy'===$kind && class_exists('CAFCC_Bank_DB')) { $indexed=CAFCC_Bank_DB::rebuild_closure(); if(is_wp_error($indexed))return $indexed; }
+            if(class_exists('CAFCC_Studio'))CAFCC_Studio::invalidate($kind,$record_id);
             return self::get($kind,$record_id);
         };
         return $inside_transaction?$write():self::transaction($write);
