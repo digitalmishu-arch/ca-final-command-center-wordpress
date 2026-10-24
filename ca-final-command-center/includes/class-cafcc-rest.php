@@ -20,6 +20,7 @@ final class CAFCC_REST {
         if ($admin && !CAFCC_Repository::admin_allowed()) {
             return CAFCC_Repository::error('Administrator access is required.', 403);
         }
+        if(!$admin && class_exists('CAFCC_Access')&&!CAFCC_Access::eligible())return CAFCC_Repository::error('Verified email, administrator approval and an active membership entitlement are required.',403);
         return true;
     }
 

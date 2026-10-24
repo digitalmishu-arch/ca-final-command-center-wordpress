@@ -65,15 +65,15 @@ final class CAFCC_Practice {
         return wp_kses($value,$tags);
     }
 
-    public static function permitted_sql($alias) {
+    public static function permitted_sql($alias,$studio=true) {
         global $wpdb;
         if (!preg_match('/^[a-z_]+$/D',$alias)) {throw new InvalidArgumentException('Invalid table alias.');}
-        return "$alias.review_status='verified' AND $alias.publication_status='published' AND $alias.approved_by>0 AND $alias.approved_revision=$alias.revision AND $alias.rights_type IN ('original','licensed') AND $alias.rights_basis<>'' AND $alias.author_name<>'' AND $alias.body_html<>'' AND ($alias.rights_expires='' OR $alias.rights_expires>=".$wpdb->prepare('%s',current_time('Y-m-d',true)).')';
+        return "$alias.review_status='verified' AND $alias.publication_status='published' AND $alias.approved_by>0 AND $alias.approved_revision=$alias.revision AND $alias.rights_type IN ('original','licensed') AND $alias.rights_basis<>'' AND $alias.author_name<>'' AND $alias.body_html<>'' AND ($alias.rights_expires='' OR $alias.rights_expires>=".$wpdb->prepare('%s',current_time('Y-m-d',true)).')'.($studio&&class_exists('CAFCC_Studio')?CAFCC_Studio::content_guard($alias):'');
     }
 
     public static function visible_question($id) {
         global $wpdb;
-        if(!is_user_logged_in() || !current_user_can('read') || CAFCC_DB::VERSION!==get_option('cafcc_db_version')){return false;}
+        if((class_exists('CAFCC_Access')&&!CAFCC_Access::eligible()) || !is_user_logged_in() || !current_user_can('read') || CAFCC_DB::VERSION!==get_option('cafcc_db_version')){return false;}
         $filters=array_fill_keys(array('subject_id','edition_id','chapter_id','unit_id','topic_id','subtopic_id','search','source_type','exam_attempt'),null);
         list($from,$where,$args)=CAFCC_Explorer::query_parts($filters,get_current_user_id());$args[]=$id;
         return (bool)$wpdb->get_var($wpdb->prepare("SELECT q.id $from WHERE $where AND q.id=%d",$args));
@@ -129,7 +129,7 @@ final class CAFCC_Practice {
             $row=array('question_id'=>$qid,'content_kind'=>$kind);
             foreach(array('body_html'=>60000,'author_name'=>190,'source_location'=>190,'rights_type'=>24,'rights_basis'=>2000,'rights_expires'=>10) as $field=>$limit){
                 $v=$input[$field]??($old[$field]??('rights_type'===$field?'reference_only':''));
-                if(!is_string($v) || strlen($v)>$limit || preg_match('~(?:drive|docs)\.google\.com~i',html_entity_decode($v,ENT_QUOTES|ENT_HTML5,'UTF-8'))){return CAFCC_Repository::error('Invalid '.$field.' or private Drive link.');}
+                if(!is_string($v) || strlen($v)>$limit || (class_exists('CAFCC_Bank_DB')&&CAFCC_Bank_DB::private_reference($v)) || preg_match('~(?:drive|docs)\.google\.com~i',html_entity_decode($v,ENT_QUOTES|ENT_HTML5,'UTF-8'))){return CAFCC_Repository::error('Invalid '.$field.' or private Drive link.');}
                 $row[$field]='body_html'===$field?self::html($v):sanitize_text_field($v);
             }
             if(!in_array($row['rights_type'],array('reference_only','original','licensed'),true)){return CAFCC_Repository::error('Select an explicit rights basis.');}

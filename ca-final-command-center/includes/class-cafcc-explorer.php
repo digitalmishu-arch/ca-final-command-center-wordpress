@@ -102,7 +102,7 @@ final class CAFCC_Explorer {
 
     private static function occurrence_where($o='o',$d='od',$dm='odm') {
         $e=CAFCC_DB::table('editions');
-        return CAFCC_Academic::published($o)." AND $d.verification_status='verified' AND $d.official_url<>'' AND ".CAFCC_Academic::published($dm).
+        return ('1=1'.(class_exists('CAFCC_Studio')?CAFCC_Studio::occurrence_guard($o):''))." AND ".CAFCC_Academic::published($o)." AND $d.verification_status='verified' AND $d.official_url<>'' AND ".CAFCC_Academic::published($dm).
             " AND EXISTS (SELECT 1 FROM $e oe WHERE oe.id=$o.edition_id AND ".CAFCC_Academic::published('oe').")";
     }
 
@@ -172,7 +172,7 @@ final class CAFCC_Explorer {
         global $wpdb;
         $o=CAFCC_DB::table('occurrences'); $d=CAFCC_DB::table('documents'); $dm=CAFCC_DB::table('document_meta');
         $where=self::occurrence_where();
-        return $wpdb->get_results($wpdb->prepare("SELECT o.id,o.occurrence_key,o.page_reference,o.question_number,o.subquestion_number,
+        return $wpdb->get_results($wpdb->prepare("SELECT o.id,o.occurrence_key,o.document_section,o.page_reference,o.question_number,o.subquestion_number,
             CASE WHEN o.marks_verified=1 THEN o.marks ELSE NULL END AS marks,o.question_type,od.title,od.official_url,od.exam_attempt,od.source_type,odm.issue_period,odm.mtp_series
             FROM $o o JOIN $d od ON od.id=o.document_id JOIN $dm odm ON odm.document_id=od.id WHERE o.question_id=%d AND $where ORDER BY o.id",$id),ARRAY_A);
     }

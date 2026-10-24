@@ -79,8 +79,8 @@
                 q.occurrences.forEach(o => {
                     const source = node('div', undefined, 'cc-occurrence');
                     source.append(node('span', sourceLabels[o.source_type] || o.source_type, 'cc-source-type'), node('strong', o.title));
-                    const details = [o.exam_attempt, o.issue_period, o.mtp_series ? 'Series ' + o.mtp_series : '', o.page_reference ? 'Page ' + o.page_reference : '', 'Q ' + o.question_number + (o.subquestion_number ? ' (' + o.subquestion_number + ')' : ''), o.marks !== null ? o.marks + ' verified marks' : ''].filter(Boolean);
-                    source.append(node('p', details.join(' · '), 'cc-meta'), link(o.official_url, 'Open Official Question Source')); sources.append(source);
+                    const details = [o.exam_attempt,o.document_section ? 'Section ' + o.document_section : '', o.issue_period, o.mtp_series ? 'Series ' + o.mtp_series : '', o.page_reference ? 'Page ' + o.page_reference : '', 'Q ' + o.question_number + (o.subquestion_number ? ' (' + o.subquestion_number + ')' : ''), o.marks !== null ? o.marks + ' verified marks' : ''].filter(Boolean);
+                    source.append(node('p', details.join(' · '), 'cc-meta'), link(o.official_url, o.source_type==='other'&&q.practice_content?.rights_label==='Independently authored'?'Official ICAI background resource':'Open Official Question Source')); sources.append(source);
                 });
                 card.append(sources);
                 const actions = node('div', undefined, 'cc-card-actions'), answerButton = node('button', 'Show Answer', 'cc-secondary'), panel = node('div', undefined, 'cc-answer-panel');
@@ -126,7 +126,7 @@
                 if (loadCatalog) {
                     const data = await api('catalog?' + params()); if (token !== generation) return;
                     fill('subject_id', data.subjects, 'All subjects', s => s.code + ' — ' + s.name);
-                    fill('edition_id', data.editions.filter(e => !fields.subject_id.value || String(e.subject_id) === fields.subject_id.value), 'All reviewed editions', e => e.title);
+                    fill('edition_id', data.editions.filter(e => !fields.subject_id.value || fields.subject_id.selectedOptions[0]?.textContent.startsWith('IBS') || String(e.subject_id) === fields.subject_id.value), 'All reviewed editions', e => e.title);
                     fields.edition_id.disabled = false;
                     fill('exam_attempt', data.exam_attempts, 'All available attempts', s => s); fill('source_type', data.source_types, 'All available sources', s => sourceLabels[s] || s);
                     await Promise.all(['chapter', 'unit', 'topic', 'subtopic'].map(async type => {
@@ -155,7 +155,7 @@
             });
         }
         function chooseConcept(item) {
-            fields.subject_id.value = item.subject_id; fields.edition_id.value = item.edition_id;
+            if(!fields.subject_id.selectedOptions[0]?.textContent.startsWith('IBS'))fields.subject_id.value = item.subject_id; if(![...fields.edition_id.options].some(o=>o.value===String(item.edition_id)))fields.edition_id.append(option(item.edition_id,item.edition_title)); fields.edition_id.value = item.edition_id; fields.search.value='';
             ['chapter_id','unit_id','topic_id','subtopic_id'].forEach(k => { fields[k].value = ''; });
             item.ancestors.forEach(a => { const f = fields[a.type + '_id']; if (f) { if (![...f.options].some(o => o.value === String(a.id))) f.append(option(a.id, a.title)); f.value = a.id; } });
             root.querySelector('.cc-selected-path').textContent = item.subject_code + ' · ' + item.edition_title + ' → ' + item.ancestors.map(a => a.title).join(' → ');
@@ -179,7 +179,7 @@
         input.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); results.querySelector('button')?.focus(); } if (e.key === 'Escape') { results.replaceChildren(); input.setAttribute('aria-expanded','false'); } });
         results.addEventListener('keydown', e => { const buttons=[...results.querySelectorAll('button')], i=buttons.indexOf(document.activeElement); if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();buttons[(i+(e.key==='ArrowDown'?1:buttons.length-1))%buttons.length]?.focus();}if(e.key==='Escape'){results.replaceChildren();input.focus();input.setAttribute('aria-expanded','false');} });
         root.querySelectorAll('[data-facet-search]').forEach(search => { let timer; search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => refresh(),300); }); });
-        ['exam_attempt', 'source_type'].forEach(key => fields[key].addEventListener('change', () => { page = 1; refresh(); }));
+        ['exam_attempt', 'source_type','practice_status'].forEach(key => fields[key].addEventListener('change', () => { page = 1; refresh(); }));
         fields.bookmarked.addEventListener('change', () => { page = 1; refresh(false); });
         root.querySelector('.cc-search').addEventListener('submit', e => { e.preventDefault(); page = 1; refresh(false); });
         root.querySelector('.cc-reset').addEventListener('click', () => { Object.values(fields).forEach(f => { if (f.type === 'checkbox') f.checked = false; else f.value = ''; }); root.querySelectorAll('[data-facet-search],.cc-concept-input').forEach(f => { f.value=''; }); results.replaceChildren(); root.querySelector('.cc-selected-path').textContent=''; page = 1; refresh(); });

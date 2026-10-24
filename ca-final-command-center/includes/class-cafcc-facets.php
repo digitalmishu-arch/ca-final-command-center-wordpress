@@ -3,17 +3,21 @@ defined('ABSPATH') || exit;
 
 /** Independent facets; SQL closure joins never load the question corpus into PHP. */
 final class CAFCC_Facets {
-    public static function init(){add_action('rest_api_init',array(__CLASS__,'routes'));}
+    public static function init(){add_action('rest_api_init',array(__CLASS__,'routes'));add_action('admin_menu',function(){if(CAFCC_Repository::admin_allowed())add_submenu_page('cafcc','Academic search aliases','Academic search aliases','manage_options','cafcc-aliases',array(__CLASS__,'screen'));});add_action('admin_post_cafcc_alias',function(){if(!CAFCC_Repository::admin_allowed()||!isset($_POST['_wpnonce'])||!is_string($_POST['_wpnonce'])||!wp_verify_nonce(wp_unslash($_POST['_wpnonce']),'cafcc_alias'))wp_die('Secure administrator request required.','',array('response'=>403));$r=self::alias(array('node_id'=>$_POST['node_id']??null,'alias_text'=>isset($_POST['alias_text'])&&is_string($_POST['alias_text'])?wp_unslash($_POST['alias_text']):'','reviewed'=>isset($_POST['reviewed'])));if(is_wp_error($r))wp_die(esc_html($r->get_error_message()));wp_safe_redirect(admin_url('admin.php?page=cafcc-aliases'));exit;});}
     public static function filters($r){
-        // Reuse text/id validation, but never demand ancestors before a child.
-        $f=CAFCC_Explorer::filters($r);if(is_wp_error($f)){return $f;}
-        $f['node_ids']=array();foreach(array('chapter_id','unit_id','topic_id','subtopic_id') as $k){if($f[$k])$f['node_ids'][]=(int)$f[$k];}
-        return $f;
+        $subject=CAFCC_Repository::id($r->get_param('subject_id'),true);if(is_wp_error($subject))return $subject;$sr=$subject?CAFCC_Repository::get('subjects',$subject):null;$ibs=$sr&&$sr['code']==='IBS';if($subject&&!$sr)return CAFCC_Repository::error('Subject unavailable.');
+        $base=clone $r;foreach(array('chapter_id','unit_id','topic_id','subtopic_id') as $key)$base->set_param($key,null);if($ibs)$base->set_param('subject_id',null);
+        $f=CAFCC_Explorer::filters($base);if(is_wp_error($f))return $f;$f['subject_id']=$subject;
+        $status=$r->get_param('practice_status')??'';if(!is_string($status)||($status&&!in_array($status,CAFCC_Repository::STATUSES,true)))return CAFCC_Repository::error('Invalid practice status.');$f['practice_status']=$status;$f['node_ids']=array();
+        foreach(array('chapter','unit','topic','subtopic') as $type){$key=$type.'_id';$id=CAFCC_Repository::id($r->get_param($key),true);if(is_wp_error($id))return $id;$f[$key]=$id;if(!$id)continue;$n=CAFCC_Academic::get('taxonomy',$id);
+            if(!$n||$n['node_type']!==$type||!CAFCC_Academic::path_published($id)||(!$ibs&&$subject&&(int)$n['subject_id']!==$subject)||($f['edition_id']&&(int)$n['edition_id']!==$f['edition_id']))return CAFCC_Repository::error('The selected concept is unavailable or has conflicting subject/edition context.');$f['node_ids'][]=$id;
+        }return $f;
     }
     public static function parts($f,$uid){
         global $wpdb;
         $base=$f;foreach(array('chapter_id','unit_id','topic_id','subtopic_id') as $k)$base[$k]=null;$base['search']='';
         list($from,$where,$args)=CAFCC_Explorer::query_parts($base,$uid);
+        if(!empty($f['practice_status'])){$where.=" AND COALESCE(p.status,'not_started')=%s";$args[]=$f['practice_status'];}
         $t=CAFCC_DB::table('question_tags');$n=CAFCC_DB::table('taxonomy');$cl=CAFCC_Bank_DB::table('closure');$aliases=CAFCC_Bank_DB::table('aliases');
         foreach($f['node_ids']??array() as $id){$where.=" AND EXISTS (SELECT 1 FROM $t bt JOIN $cl bc ON bc.descendant_id=bt.node_id JOIN $n bn ON bn.id=bt.node_id WHERE bt.question_id=q.id AND bc.ancestor_id=%d AND ".CAFCC_Academic::published('bt')." AND ".CAFCC_Academic::published('bn').")";$args[]=$id;}
         if(!empty($f['search'])){$like='%'.$wpdb->esc_like($f['search']).'%';$content=CAFCC_Practice::table('content');
@@ -31,7 +35,7 @@ final class CAFCC_Facets {
         $sql="SELECT n.id,n.title,n.node_type,n.edition_id,n.subject_id,n.parent_id,n.heading_origin,e.title AS edition_title,s.code AS subject_code FROM $n n JOIN $e e ON e.id=n.edition_id JOIN $s s ON s.id=n.subject_id WHERE ".CAFCC_Academic::published('n')." AND ".CAFCC_Academic::published('e');$na=array();
         if($term){$sql.=" AND (n.title LIKE %s OR EXISTS(SELECT 1 FROM $a a WHERE a.node_id=n.id AND a.review_status='verified' AND a.alias_text LIKE %s))";$like='%'.$wpdb->esc_like($term).'%';array_push($na,$like,$like);}
         if($type){$sql.=' AND n.node_type=%s';$na[]=$type;}
-        if($f['subject_id']){$sql.=' AND n.subject_id=%d';$na[]=$f['subject_id'];}if($f['edition_id']){$sql.=' AND n.edition_id=%d';$na[]=$f['edition_id'];}
+        if($f['subject_id']&&CAFCC_Repository::get('subjects',$f['subject_id'])['code']!=='IBS'){$sql.=' AND n.subject_id=%d';$na[]=$f['subject_id'];}if($f['edition_id']){$sql.=' AND n.edition_id=%d';$na[]=$f['edition_id'];}
         // A published heading is offered only when an eligible published question is tagged beneath it.
         $sql.=" AND EXISTS(SELECT 1 $from JOIN $t nt ON nt.question_id=q.id JOIN $cl nc ON nc.descendant_id=nt.node_id WHERE $where AND nc.ancestor_id=n.id AND ".CAFCC_Academic::published('nt').") ORDER BY n.position,n.id LIMIT 31";array_push($na,...$args);
         $rows=$wpdb->get_results($wpdb->prepare($sql,$na),ARRAY_A);$more=count($rows)>30;$rows=array_slice($rows,0,30);
@@ -49,7 +53,7 @@ final class CAFCC_Facets {
         foreach(array('source_type','exam_attempt') as $key){if(!empty($f[$key])){$where.=" AND bd.$key=%s";$args[]=$f[$key];}}
         $total=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) $from WHERE $where",$args));$qa=$args;array_push($qa,20,($f['page']-1)*20);
         $rows=$wpdb->get_results($wpdb->prepare("SELECT q.id,q.title,q.question_number,c.title AS chapter_title,c.syllabus_version,s.code AS subject_code,qm.edition_id,qm.stable_key,qm.question_type,bo.id AS occurrence_id,COALESCE(p.status,'not_started') AS progress_status $from WHERE $where ORDER BY bo.id DESC LIMIT %d OFFSET %d",$qa),ARRAY_A);
-        foreach($rows as &$q){$q['occurrences']=array_values(array_filter(CAFCC_Explorer::occurrences($q['id']),function($o)use($q){return (int)$o['id']===(int)$q['occurrence_id'];}));$q['classifications']=CAFCC_Explorer::tags($q['id']);$q['practice_content']=CAFCC_Practice::public_content((int)$q['id'],'question');$q['notebook']=CAFCC_Practice::notebook((int)$q['id']);$q['legacy_reference']=false;}
+        foreach($rows as &$q){$q['occurrences']=array_values(array_filter(CAFCC_Explorer::occurrences($q['id']),function($o)use($q){return (int)$o['id']===(int)$q['occurrence_id'];}));$q['classifications']=CAFCC_Explorer::tags($q['id']);$q['practice_content']=class_exists('CAFCC_Studio')?CAFCC_Studio::occurrence_content((int)$q['id'],(int)$q['occurrence_id'],'question'):CAFCC_Practice::public_content((int)$q['id'],'question');$q['notebook']=CAFCC_Practice::notebook((int)$q['id']);$q['legacy_reference']=false;if(class_exists('CAFCC_Studio')){$rt=CAFCC_Studio::table();$context=$wpdb->get_var($wpdb->prepare("SELECT JSON_EXTRACT(payload,'$.classification_context') FROM $rt WHERE occurrence_id=%d AND publication_status='published'",$q['occurrence_id']));$q['primary_classification']=json_decode($context?:'{}',true);if(!empty($q['primary_classification']['chapter']['title']))$q['chapter_title']=$q['primary_classification']['chapter']['title'];}}
         return array('items'=>$rows,'total'=>$total,'per_page'=>20,'page'=>$f['page']);
     }
     public static function summary($r){
@@ -71,7 +75,11 @@ final class CAFCC_Facets {
         $id=CAFCC_Repository::id($data['node_id']??null);$text=$data['alias_text']??'';
         if(is_wp_error($id)||!CAFCC_Academic::get('taxonomy',$id)||!is_string($text)||!trim($text)||strlen($text)>190)return CAFCC_Repository::error('Choose an existing node and a short alias.');
         global $wpdb;$row=array('node_id'=>$id,'alias_text'=>sanitize_text_field($text),'review_status'=>true===($data['reviewed']??false)?'verified':'needs_review');
-        if(false===$wpdb->replace(CAFCC_Bank_DB::table('aliases'),$row))return CAFCC_Repository::error('Cannot save alias.',500);return $row;
+        return CAFCC_Academic::transaction(function()use($row){global $wpdb;$t=CAFCC_Bank_DB::table('aliases');$before=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE node_id=%d AND alias_text=%s FOR UPDATE",$row['node_id'],$row['alias_text']),ARRAY_A);if(false===($before?$wpdb->update($t,$row,array('id'=>$before['id'])):$wpdb->insert($t,$row)))return CAFCC_Repository::error('Cannot save alias.',500);$id=$before?$before['id']:$wpdb->insert_id;if(!CAFCC_Bank_DB::audit_master('aliases',$id,$before,$row))return CAFCC_Repository::error('Cannot retain alias audit.',500);return array_merge($row,array('id'=>$id));});
+    }
+    public static function screen(){
+        if(!CAFCC_Repository::admin_allowed())wp_die('Administrator access required.');global $wpdb;$t=CAFCC_DB::table('taxonomy');$term=isset($_GET['term'])&&is_string($_GET['term'])?sanitize_text_field(wp_unslash($_GET['term'])):'';$rows=$wpdb->get_results($wpdb->prepare("SELECT id,title,node_type,edition_id,heading_origin,review_status FROM $t WHERE title LIKE %s ORDER BY id DESC LIMIT 50",'%'.$wpdb->esc_like($term).'%'),ARRAY_A);
+        echo '<div class="wrap"><h1>Academic search aliases</h1><p>Aliases are student search terms, not new official ICAI headings. Review taxonomy in the Connected academic manager first. New aliases start unreviewed unless you explicitly confirm them.</p><form method="get"><input type="hidden" name="page" value="cafcc-aliases"><label>Find an academic node <input name="term" value="'.esc_attr($term).'"></label><button class="button">Find</button></form><table class="widefat"><thead><tr><th>ID</th><th>Title</th><th>Edition</th><th>Origin / status</th></tr></thead><tbody>';foreach($rows as $r)echo '<tr><td>'.esc_html($r['id']).'</td><td>'.esc_html($r['title']).'</td><td>'.esc_html($r['edition_id']).'</td><td>'.esc_html($r['heading_origin'].' / '.$r['review_status']).'</td></tr>';echo '</tbody></table><h2>Add or re-review an alias</h2><form method="post" action="'.esc_url(admin_url('admin-post.php')).'">'.wp_nonce_field('cafcc_alias','_wpnonce',true,false).'<input type="hidden" name="action" value="cafcc_alias"><p><label>Node ID <input name="node_id" type="number" min="1" required></label></p><p><label>Search alias <input name="alias_text" maxlength="190" placeholder="For example: IndAS115" required></label></p><label><input type="checkbox" name="reviewed"> I reviewed this alias and its exact edition/node mapping.</label><p><button class="button button-primary">Save alias</button></p></form><p>The student autocomplete still requires an eligible published question under the reviewed path. Adding an alias never publishes a question or a draft taxonomy node.</p></div>';
     }
     public static function routes(){
         register_rest_route('cafcc/v4','/answers/(?P<id>[1-9][0-9]{0,17})',array('methods'=>'GET','permission_callback'=>function($r){return CAFCC_REST::permission($r);},'callback'=>function($r){return class_exists('CAFCC_Studio')?CAFCC_Studio::answers((int)$r['id'],(int)$r->get_param('occurrence_id')):CAFCC_Explorer::answers((int)$r['id']);}));

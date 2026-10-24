@@ -14,9 +14,9 @@ final class CAFCC_Academic {
         return array(
             'editions' => array_merge(array('edition_key'=>'key', 'subject_id'=>'subjects!', 'title'=>'text!', 'edition_month'=>'month', 'reprint_month'=>'month', 'applicability'=>'long!', 'source_url'=>'url!', 'date_note'=>'long'), $review),
             'taxonomy' => array_merge(array('node_key'=>'key', 'edition_id'=>'editions!', 'subject_id'=>'subjects!', 'parent_id'=>'taxonomy', 'node_type'=>'node_type', 'title'=>'text!', 'position'=>'position', 'heading_origin'=>'origin', 'source_url'=>'url', 'source_location'=>'text'), $review),
-            'documents' => array_merge(array('document_key'=>'key', 'document_id'=>'documents', 'edition_id'=>'editions!', 'title'=>'text!', 'source_type'=>'source', 'exam_attempt'=>'text!', 'official_url'=>'url!', 'issue_period'=>'text', 'mtp_series'=>'text'), $review),
+            'documents' => array_merge(array('document_key'=>'key', 'document_id'=>'documents', 'edition_id'=>'editions!', 'title'=>'text!', 'source_type'=>'source', 'exam_attempt'=>'text!', 'official_url'=>'url!', 'issue_period'=>'text', 'mtp_series'=>'text','source_sha256'=>'sha256','source_revision'=>'text','scheme'=>'text','law_context'=>'context'), $review),
             'questions' => array_merge(array('stable_key'=>'key', 'question_id'=>'questions', 'edition_id'=>'editions!', 'primary_subject_id'=>'subjects!', 'document_id'=>'documents!', 'chapter_node_id'=>'taxonomy', 'title'=>'text!', 'question_number'=>'text!', 'question_type'=>'question_type', 'family_id'=>'families'), $review),
-            'occurrences' => array_merge(array('occurrence_key'=>'key', 'question_id'=>'questions!', 'document_id'=>'documents!', 'edition_id'=>'editions!', 'page_reference'=>'text', 'question_number'=>'text!', 'subquestion_number'=>'text', 'marks'=>'marks', 'marks_verified'=>'bool', 'question_type'=>'question_type'), $review),
+            'occurrences' => array_merge(array('occurrence_key'=>'key', 'question_id'=>'questions!', 'document_id'=>'documents!', 'edition_id'=>'editions!', 'page_reference'=>'text', 'question_number'=>'text!', 'subquestion_number'=>'text','document_section'=>'text', 'marks'=>'marks', 'marks_verified'=>'bool', 'question_type'=>'question_type'), $review),
             'tags' => array_merge(array('question_id'=>'questions!', 'node_id'=>'taxonomy!'), $review),
             'subject_tags' => array_merge(array('question_id'=>'questions!', 'subject_id'=>'subjects!'), $review),
             'answers' => array_merge(array('answer_key'=>'key', 'question_id'=>'questions!', 'occurrence_id'=>'occurrences', 'answer_mode'=>'answer_mode', 'answer_text'=>'answer', 'rights_basis'=>'rights', 'official_url'=>'url', 'source_location'=>'text'), $review),
@@ -128,12 +128,13 @@ final class CAFCC_Academic {
                 if ('url' === $type) { $value = CAFCC_Repository::official_url($value); }
                 else { $value = 'answer' === $type ? sanitize_textarea_field($value) : sanitize_text_field($value); }
                 if (is_wp_error($value)) { return $value; }
-                $limit = array('text'=>190,'long'=>500,'rights'=>1000,'answer'=>30000,'key'=>120,'month'=>7,'url'=>2048)[$type] ?? 190;
+                $limit = array('text'=>190,'long'=>500,'rights'=>1000,'answer'=>30000,'key'=>120,'month'=>7,'url'=>2048,'context'=>2000,'sha256'=>64)[$type] ?? 190;
                 if (strlen($value)>$limit || ($required && ''===$value)) { return CAFCC_Repository::error($key.' is required or exceeds its length limit.'); }
                 if ('key'===$type && !preg_match('/^[A-Za-z0-9][A-Za-z0-9_.:-]{1,119}$/D',$value)) { return CAFCC_Repository::error('Stable keys must use 2–120 letters, digits, dots, colons, hyphens or underscores.'); }
                 if ('month'===$type && ''!==$value && !preg_match('/^[12][0-9]{3}-(0[1-9]|1[0-2])$/D',$value)) { return CAFCC_Repository::error('Edition dates must be YYYY-MM or blank when unknown.'); }
             }
             if (is_wp_error($value)) { return $value; }
+            if(is_string($value)&&class_exists('CAFCC_Bank_DB')&&CAFCC_Bank_DB::private_reference($value))return CAFCC_Repository::error('Private Drive references must remain outside public academic records.');
             $data[$key]=$value;
         }
         if (isset($data['publication_status']) && 'published'===$data['publication_status'] && 'verified'!==$data['review_status']) { return CAFCC_Repository::error('Publication requires verification.'); }
@@ -159,6 +160,7 @@ final class CAFCC_Academic {
             $old=self::get('editions',$id);
             if ($old['edition_key']!==$data['edition_key'] || (int)$old['subject_id']!==$data['subject_id']) { return CAFCC_Repository::error('Edition identity cannot be reassigned. Create a separate edition.',409); }
         }
+        if('documents'===$kind&&!empty($data['source_sha256'])&&!preg_match('/^[a-f0-9]{64}$/D',$data['source_sha256']))return CAFCC_Repository::error('Source digest must be a SHA-256 or blank for legacy references.');
         if ('documents'===$kind && 'mtp'!==$data['source_type'] && $data['mtp_series']) { return CAFCC_Repository::error('MTP series applies only to MTP documents.'); }
         if ('questions'===$kind) {
             $doc=self::get('documents',$data['document_id']);
@@ -271,7 +273,7 @@ final class CAFCC_Academic {
                 } else { $saved=CAFCC_Repository::save('documents',$base,$id); }
                 if (is_wp_error($saved)) { return $saved; }
                 $id=(int)$saved['id'];
-                $row=array_intersect_key($data,array_flip(array('document_key','edition_id','issue_period','mtp_series','review_status','publication_status')));
+                $row=array_intersect_key($data,array_flip(array('document_key','edition_id','issue_period','mtp_series','source_sha256','source_revision','scheme','law_context','review_status','publication_status')));if($old&&!empty($old['source_sha256'])&&$old['source_sha256']!==$data['source_sha256'])return CAFCC_Repository::error('Source bytes are immutable. Create a separate source revision and retain the old occurrence IDs.',409);
                 $row['document_id']=$id; $where=array('document_id'=>$id);
             } elseif ('questions'===$kind) {
                 if ($old && ($old['stable_key']!==$data['stable_key'] || (int)$old['edition_id']!==$data['edition_id'] || (int)$old['primary_subject_id']!==$data['primary_subject_id'] || (int)$old['question_id']!==(int)$data['question_id'])) { return CAFCC_Repository::error('Stable question identity and edition cannot be reassigned.',409); }
@@ -300,7 +302,7 @@ final class CAFCC_Academic {
                 $row['question_id']=$id; $where=array('question_id'=>$id);
             } elseif ('occurrences'===$kind) {
                 $doc=self::get('documents',$data['document_id']);
-                $row['location_hash']=hash('sha256',implode('|',array($doc['official_url'],$data['edition_id'],strtolower(trim($data['page_reference'])),strtolower(trim($data['question_number'])),strtolower(trim($data['subquestion_number'])))));
+                $identity=array($doc['official_url'],$data['edition_id'],strtolower(trim($data['page_reference'])),strtolower(trim($data['question_number'])),strtolower(trim($data['subquestion_number'])));if(!empty($doc['source_sha256']))$identity[]='sha256:'.$doc['source_sha256'];if(!empty($data['document_section']))$identity[]='section:'.$data['document_section'];$row['location_hash']=hash('sha256',implode('|',$identity));
             }
             if (!$old) { $row['batch_id']=$batch_id; }
             $suppressed=$wpdb->suppress_errors(true);
@@ -311,7 +313,8 @@ final class CAFCC_Academic {
             $record_id=in_array($kind,array('documents','questions'),true)?$id:($id?:$wpdb->insert_id);
             if ('taxonomy'===$kind && class_exists('CAFCC_Bank_DB')) { $indexed=CAFCC_Bank_DB::rebuild_closure(); if(is_wp_error($indexed))return $indexed; }
             if(class_exists('CAFCC_Studio'))CAFCC_Studio::invalidate($kind,$record_id);
-            return self::get($kind,$record_id);
+            $saved=self::get($kind,$record_id);if(class_exists('CAFCC_Bank_DB')&&!CAFCC_Bank_DB::audit_master($kind,$record_id,$old,$saved))return CAFCC_Repository::error('Cannot retain academic master history.',500);
+            return $saved;
         };
         return $inside_transaction?$write():self::transaction($write);
     }

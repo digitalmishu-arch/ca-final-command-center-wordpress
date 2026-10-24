@@ -1,4 +1,4 @@
-name: Test component and build review-only plugin
+name: Test and build WordPress plugin
 on:
   push:
     branches: [main, 'feat/**']
@@ -21,11 +21,7 @@ jobs:
           CAFCC_TEST_LEGACY: ${{ matrix.legacy }}
       - name: Check JavaScript syntax
         run: |
-          node --check ca-final-command-center/assets/admin.js
-          node --check ca-final-command-center/assets/student.js
-          node --check ca-final-command-center/assets/explorer.js
-          node --check ca-final-command-center/assets/manager.js
-          node --check ca-final-command-center/assets/practice-admin.js
+          for asset in ca-final-command-center/assets/*.js; do node --check "$asset"; done
       - name: Build installable ZIP
         if: matrix.legacy == '0'
         run: python3 scripts/build.py
@@ -33,7 +29,7 @@ jobs:
         if: matrix.legacy == '0'
         uses: actions/upload-artifact@v4
         with:
-          name: component-review-only-not-final-release
+          name: ca-final-command-center-0.4.0
           path: dist/ca-final-command-center.zip
           if-no-files-found: error
           retention-days: 30
@@ -47,13 +43,13 @@ jobs:
           python-version: '3.12'
       - name: Install browser test tools on the CI runner only
         run: |
-          python3 -m pip install playwright==1.56.0
+          python3 -m pip install playwright==1.56.0 openpyxl==3.1.5
           python3 -m playwright install --with-deps chromium
-      - name: Independent facets and retained CSV browser checks (component scope)
-        run: bash tests/run-component-browser.sh
+      - name: Explorer, Studio, Excel, registration and private-practice browser regressions
+        run: bash tests/run-browser.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: authored-practice-browser-previews
-          path: docs/previews/v04-empty-ipad.png
+          name: v04-authored-browser-previews
+          path: docs/previews/v04-*.png
           if-no-files-found: error
           retention-days: 30

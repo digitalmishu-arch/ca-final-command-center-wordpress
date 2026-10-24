@@ -42,7 +42,7 @@ final class CAFCC_Academic_UI {
                 return 'catalog'===$method?CAFCC_Explorer::catalog($f):CAFCC_Explorer::$method($f,get_current_user_id());
             }));
         }
-        register_rest_route('cafcc/v2','/answers/(?P<id>[1-9][0-9]{0,17})',array('methods'=>'GET','permission_callback'=>$student,'callback'=>function($r){return CAFCC_Explorer::answers((int)$r['id']);}));
+        register_rest_route('cafcc/v2','/answers/(?P<id>[1-9][0-9]{0,17})',array('methods'=>'GET','permission_callback'=>$student,'callback'=>function($r){return CAFCC_Studio::answers((int)$r['id'],absint($r->get_param('occurrence_id')));}));
         register_rest_route('cafcc/v2','/admin/import/preview',array('methods'=>'POST','permission_callback'=>$admin,'callback'=>function($r){
             $body=self::body($r,1100000);if(is_wp_error($body)){return $body;}
             if (array_diff(array_keys($body),array('type','csv'))) {return CAFCC_Repository::error('Unexpected import fields.');}
@@ -102,7 +102,7 @@ final class CAFCC_Academic_UI {
             </aside><main class="cc-results"><div class="cc-section-title"><div><span class="cc-eyebrow">QUESTION LIBRARY</span><h3>Question Explorer</h3></div><span class="cc-result-count"></span></div>
                 <div class="cc-filter-chips" aria-label="Active filters"></div><label>Find an academic concept<input type="search" class="cc-concept-input" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cc-concept-results" placeholder="Try Embedded Derivatives or Ind AS 115"></label><div id="cc-concept-results" role="listbox" class="cc-concept-results"></div><p class="cc-selected-path" aria-live="polite"></p><form class="cc-search"><label class="cc-search-label">Search questions<input type="search" data-filter="search" placeholder="Concept, Ind AS, permitted question text or reference"></label><button type="submit">Search</button></form>
                 <div class="cc-source-filters"><label>Exam attempt<select data-filter="exam_attempt"><option value="">All available attempts</option></select></label><label>Source<select data-filter="source_type"><option value="">All available sources</option></select></label></div>
-                <label class="cc-checkbox"><input type="checkbox" data-filter="bookmarked" value="1"> My bookmarks only</label>
+                <label>My practice status<select data-filter="practice_status"><option value="">All statuses</option><option value="not_started">Not Started</option><option value="attempted">Attempted</option><option value="needs_revision">Needs Revision</option><option value="completed">Completed</option></select></label><label class="cc-checkbox"><input type="checkbox" data-filter="bookmarked" value="1"> My bookmarks only</label>
                 <p class="cc-feedback" role="status" aria-live="polite">Loading your workspace…</p><div class="cc-question-list"></div><nav class="cc-pagination" aria-label="Question pages"></nav>
                 <p class="cc-note">No repetition percentages or advanced analytics are inferred. Question text and solutions appear only when publication and rights requirements are met.</p>
             </main></div>

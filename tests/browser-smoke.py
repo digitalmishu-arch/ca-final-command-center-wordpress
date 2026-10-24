@@ -13,36 +13,21 @@ with sync_playwright() as p:
     page.locator('#user_pass').fill('cafcc-disposable-only')
     page.locator('#wp-submit').click()
     page.wait_for_load_state('networkidle')
-    page.goto('http://127.0.0.1:8092/?page_id=4',wait_until='networkidle')
+    page.goto('http://127.0.0.1:8092/?cafcc_view=explorer',wait_until='networkidle')
     page.wait_for_function("document.querySelector('[data-cafcc-explorer]') && !document.querySelector('[data-cafcc-explorer]').hasAttribute('aria-busy')")
-    print('initial:',page.locator('.cc-feedback').inner_text())
-    print('subjects:',page.locator('[data-filter=subject_id] option').all_text_contents())
-    page.locator('[data-filter=subject_id]').select_option(label='FR — Financial Reporting')
-    page.wait_for_load_state('networkidle')
-    page.wait_for_function("document.querySelectorAll('[data-filter=chapter_id] option').length>1")
-    chapter=page.locator('[data-filter=chapter_id] option').evaluate_all("options=>options.find(n=>n.textContent.startsWith('Chapter 11:')).value")
-    page.locator('[data-filter=chapter_id]').select_option(chapter)
-    page.wait_for_load_state('networkidle')
-    page.wait_for_function("document.querySelectorAll('[data-filter=unit_id] option').length===8")
-    unit=page.locator('[data-filter=unit_id] option').evaluate_all("options=>options.find(n=>n.textContent.includes('Unit 4')).value")
-    page.locator('[data-filter=unit_id]').select_option(unit)
-    page.wait_for_load_state('networkidle')
-    page.wait_for_function("!document.querySelector('[data-cafcc-explorer]').hasAttribute('aria-busy')")
-    assert page.locator('.cc-question-list').inner_text().find('No verified, published questions')>=0
-    assert page.locator('[data-filter=unit_id] option').count()==8
-    assert page.locator('[data-filter=topic_id] option').count()>=3
-    assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
-    page.screenshot(path='docs/previews/ipad-explorer.png',full_page=True)
-    page.set_viewport_size({'width':390,'height':844})
-    page.screenshot(path='docs/previews/phone-explorer.png',full_page=True)
-    assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
-    page.locator('[data-filter=subject_id]').select_option(label='AFM — Advanced Financial Management')
-    page.wait_for_load_state('networkidle')
-    page.wait_for_function("document.querySelectorAll('[data-filter=chapter_id] option').length===16")
-    assert page.locator('[data-filter=unit_id]').input_value()==''
-    assert page.locator('[data-filter=topic_id]').input_value()==''
+    assert page.locator('[data-filter=subject_id] option').count()==7
+    assert page.locator('[data-filter=topic_id]').is_enabled()
+    assert page.locator('.cc-question').count()==0
+    assert 'No verified, published questions' in page.locator('.cc-question-list').inner_text()
+    page.locator('.cc-concept-input').fill('Embedded Derivatives')
+    page.wait_for_function("document.querySelector('#cc-concept-results').textContent.includes('No reviewed questions')")
+    assert not page.locator('#cc-concept-results button').count()
+    for width in [390,768,1180]:
+        page.set_viewport_size({'width':width,'height':900})
+        assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
+    page.screenshot(path='docs/previews/v04-empty-ipad.png',full_page=True)
     assert not errors,errors
-    print(json.dumps({'browser':'Chromium','checks':['real WordPress login','FR dependent chapter/unit/topic options','empty verified-question state','iPad/phone no horizontal overflow','subject change clears descendants','no JavaScript page errors'],'errors':errors}))
+    print('Browser: honest empty states, no unavailable concept suggestions, usable independent selectors and responsive layout passed.')
     admin_context=browser.new_context(viewport={'width':1180,'height':900})
     manager=admin_context.new_page()
     manager.on('pageerror',lambda error:errors.append(str(error)))
@@ -63,21 +48,13 @@ with sync_playwright() as p:
     manager.locator('#cc-commit').click()
     manager.wait_for_function("document.querySelector('.cc-admin-feedback').textContent.includes('imported')")
     assert 'Review records before publication' in manager.locator('.cc-admin-feedback').inner_text()
-    # Exercise a synthetic test question through the real student UI. It is never packaged.
+    # An old manager publication flag cannot bypass the new review gates.
     manager.evaluate("""async()=>{const cfg=CAFCCManager;const r=await fetch(cfg.url+'admin/questions',{headers:{'X-WP-Nonce':cfg.nonce}});const data=await r.json();const q=data.items.find(n=>n.stable_key==='TEST-QUESTION-001');const result=await fetch(cfg.url+'admin/questions/'+q.id,{method:'PATCH',headers:{'X-WP-Nonce':cfg.nonce,'Content-Type':'application/json'},body:JSON.stringify({review_status:'verified',publication_status:'published'})});if(!result.ok)throw new Error(await result.text());}""")
-    page.goto('http://127.0.0.1:8092/?page_id=4',wait_until='networkidle')
-    page.wait_for_function("document.querySelectorAll('.cc-question').length===1")
-    assert 'TEST ONLY connected question' in page.locator('.cc-question').inner_text()
-    page.get_by_role('button',name='Show Answer',exact=True).click()
-    page.wait_for_function("document.querySelector('.cc-answer-panel').textContent.includes('independently authored solution')")
-    assert page.get_by_role('link',name='View Official Answer',exact=True).count()==1
-    assert 'PRIVATE DRAFT ANSWER' not in page.locator('.cc-answer-panel').inner_text()
-    page.locator('.cc-card-actions select').select_option('needs_revision')
-    page.wait_for_function("document.querySelector('.cc-feedback').textContent.includes('saved')")
-    page.reload(wait_until='networkidle')
-    page.wait_for_function("document.querySelector('.cc-card-actions select')?.value==='needs_revision'")
+    page.goto('http://127.0.0.1:8092/?cafcc_view=explorer',wait_until='networkidle')
+    page.wait_for_function("document.querySelector('[data-cafcc-explorer]') && !document.querySelector('[data-cafcc-explorer]').hasAttribute('aria-busy')")
+    assert page.locator('.cc-question').count()==0
     assert not errors,errors
-    print(json.dumps({'admin_and_student_checks':['real admin login and manager rendering','CSV file preview and commit through UI','reviewed question rendering','authored solution and official answer link','draft answer hidden','practice status persists after reload'],'errors':errors}))
+    print('Browser: actual CSV preview/commit retained; old manager cannot bypass separate Studio approvals.')
     admin_context.close()
     context.close()
     browser.close()

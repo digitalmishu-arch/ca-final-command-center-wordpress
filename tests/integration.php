@@ -50,6 +50,11 @@ CAFCC_Practice::init();
 CAFCC_Facets::init();
 CAFCC_Studio::init();
 CAFCC_Review_XLSX::init();
+CAFCC_Access::init();
+CAFCC_Portal::init();
+CAFCC_Resources::init();
+add_filter('pre_wp_mail',function(){return true;});
+foreach(array($student_a,$student_b) as $test_uid){$r=CAFCC_Access::get($test_uid);$grant=CAFCC_Access::decide($test_uid,array('expected_version'=>$r['version'],'action'=>'approve','plan_key'=>'test-original-fixtures','expires_at'=>'','legacy_identity_verified'=>true));if(is_wp_error($grant))throw new RuntimeException($grant->get_error_message());}
 require __DIR__ . "/v04-baseline-fixtures.php";
 $server = rest_get_server();
 $count = 0;
@@ -160,7 +165,7 @@ check(call_api('POST', 'admin/subjects', array('code' => 'XX', 'name' => 'Attack
 wp_set_current_user(0);
 check(call_api('GET', 'questions')->get_status() === 401, 'Anonymous visitors cannot read student questions');
 check(call_api('PUT', 'progress/' . $q['id'], array('status' => 'completed'))->get_status() === 401, 'Anonymous visitors cannot save progress');
-check(str_contains(CAFCC_Frontend::render(), 'sign in'), 'Public dashboard shows sign-in state');
+check(str_contains(CAFCC_Frontend::render(), 'Sign in'), 'Public dashboard shows sign-in state');
 wp_set_current_user($student_a);
 check(call_api('GET', 'questions')->get_data()['total'] === 1, 'Students see only the verified published question');
 check(count(call_api('GET', 'catalog')->get_data()['chapters']) === 1, 'Catalog hides chapters without published verified questions');
@@ -225,4 +230,6 @@ require __DIR__ . "/v02.php";
 require __DIR__ . "/v03.php";
 require __DIR__ . "/v04-facets.php";
 require __DIR__ . "/v04-studio.php";
+require __DIR__ . "/v04-access.php";
+require __DIR__ . "/v04-performance.php";
 echo "\n$count integration assertions passed on WordPress " . get_bloginfo('version') . ', PHP ' . PHP_VERSION . ".\n";

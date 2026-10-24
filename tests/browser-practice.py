@@ -20,16 +20,13 @@ def ready(page):
 
 
 def select_fr(page):
-    page.goto(BASE+'/?page_id=4',wait_until='networkidle');ready(page)
-    page.locator('[data-filter=subject_id]').select_option(label='FR — Financial Reporting');ready(page)
-    page.wait_for_function("() => document.querySelectorAll('[data-filter=chapter_id] option').length>1")
-    chapter=page.locator('[data-filter=chapter_id] option').evaluate_all("opts=>opts.find(o=>o.textContent.startsWith('Chapter 5:')).value")
-    page.locator('[data-filter=chapter_id]').select_option(chapter);ready(page)
-    page.wait_for_function("() => document.querySelectorAll('[data-filter=unit_id] option').length>1")
-    unit=page.locator('[data-filter=unit_id] option').evaluate_all("opts=>opts.find(o=>o.textContent.includes('Ind AS 16')).value")
-    page.locator('[data-filter=unit_id]').select_option(unit);ready(page)
-    page.locator('[data-filter=topic_id]').select_option(label='Straight-line depreciation — authored demo · Editorial tag');ready(page)
-    page.locator('[data-filter=subtopic_id]').select_option(label='Calculate the stated example · Editorial tag');ready(page)
+    page.goto(BASE+'/?cafcc_view=explorer',wait_until='networkidle');ready(page)
+    page.locator('.cc-concept-input').fill('Straight-line depreciation')
+    button=page.locator('#cc-concept-results button').filter(has_text='Straight-line depreciation').first
+    expect(button).to_be_visible();button.click();ready(page)
+    expect(page.locator('[data-filter=subject_id]')).not_to_have_value('')
+    expect(page.locator('[data-filter=chapter_id]')).not_to_have_value('')
+    expect(page.locator('[data-filter=unit_id]')).not_to_have_value('')
     expect(page.locator('.cc-question')).to_have_count(1)
     return page.locator('.cc-question')
 
@@ -44,11 +41,11 @@ with sync_playwright() as runtime:
     assert not card.locator('.cc-answer-panel').is_visible();assert 'Work through the calculation' not in page.locator('body').inner_text();assert not answer_requests
     qid=card.get_attribute('data-question-id')
     preview=ROOT/'docs/previews';preview.mkdir(parents=True,exist_ok=True)
-    page.screenshot(path=str(preview/'v03-ipad-practice.png'),full_page=True)
+    page.screenshot(path=str(preview/'v04-ipad-practice.png'),full_page=True)
     card.get_by_role('button',name='Show Answer',exact=True).focus();page.keyboard.press('Enter')
     expect(card.locator('.cc-answer-panel')).to_contain_text('Work through the calculation')
     expect(card.locator('.cc-answer-panel math')).to_have_count(1);assert len(answer_requests)==1
-    page.screenshot(path=str(preview/'v03-ipad-answer.png'),full_page=True)
+    page.screenshot(path=str(preview/'v04-ipad-answer.png'),full_page=True)
     card.get_by_role('button',name='Hide Answer',exact=True).click();assert not card.locator('.cc-answer-panel').inner_text()
     card.get_by_role('button',name='☆ Bookmark',exact=True).click();expect(card.locator('.cc-bookmark')).to_have_attribute('aria-pressed','true')
     card.locator('.cc-private-notes summary').click();card.locator('.cc-private-notes textarea').fill('PRIVATE NOTE A · authored preview');card.get_by_role('button',name='Save my note',exact=True).click();expect(page.locator('.cc-feedback')).to_contain_text('private note is saved')
@@ -58,7 +55,7 @@ with sync_playwright() as runtime:
     card=select_fr(page);expect(card.locator('.cc-bookmark')).to_have_attribute('aria-pressed','true');expect(card.locator('.cc-card-actions select')).to_have_value('needs_revision');expect(card.locator('.cc-private-notes textarea')).to_have_value('PRIVATE NOTE A · authored preview')
     for width in [375,390,768,1024,1440]:
         page.set_viewport_size({'width':width,'height':900});assert page.evaluate('() => document.documentElement.scrollWidth<=window.innerWidth'),width
-    page.set_viewport_size({'width':390,'height':844});page.screenshot(path=str(preview/'v03-phone-practice.png'),full_page=True)
+    page.set_viewport_size({'width':390,'height':844});page.screenshot(path=str(preview/'v04-phone-practice.png'),full_page=True)
     # A separate login receives no A note/bookmark/completion.
     bcontext=browser.new_context(viewport={'width':1024,'height':900},reduced_motion='reduce');b=bcontext.new_page();login(b,'student_b');bcard=select_fr(b)
     expect(bcard.locator('.cc-bookmark')).to_have_attribute('aria-pressed','false');expect(bcard.locator('.cc-private-notes textarea')).to_have_value('');expect(bcard.locator('.cc-card-actions select')).to_have_value('not_started')
@@ -73,7 +70,20 @@ with sync_playwright() as runtime:
     admin.get_by_role('button',name='Save as Draft / Needs Review',exact=True).click();expect(admin.locator('#pc-feedback')).to_contain_text('Draft saved')
     page.reload(wait_until='networkidle');ready(page);card=select_fr(page);expect(card.locator('.cc-reference-note')).to_have_count(1);expect(card.locator('.cc-question-content')).to_have_count(0)
     admin.locator('#pc-confirm').check();admin.get_by_role('button',name='Approve this revision',exact=True).click();expect(admin.locator('#pc-feedback')).to_contain_text('Revision approved')
+    page.reload(wait_until='networkidle');ready(page);card=select_fr(page);expect(card.locator('.cc-reference-note')).to_have_count(1)
+    # The v0.3 content approval alone cannot bypass the separate Studio revision gate.
+    admin.goto(BASE+'/wp-admin/admin.php?page=cafcc-studio',wait_until='networkidle')
+    admin.locator('#studio-search').fill('EXISTING-O-')
+    admin.wait_for_timeout(500)
+    target=admin.locator('#studio-rows tr').filter(has_text='FR').first
+    target.locator('td button').first.click()
+    expect(admin.locator('#studio-panel')).to_be_visible()
+    admin.get_by_role('button',name=re.compile('^Approve Question Revision')).click()
+    expect(admin.locator('#studio-panel [data-action=question_revision]')).to_contain_text('✓')
+    admin.get_by_role('button',name='Publish When Eligible',exact=True).click()
+    expect(admin.locator('#studio-detail small')).to_contain_text('approved')
+    admin.get_by_role('button',name='Close',exact=True).click()
     page.reload(wait_until='networkidle');ready(page);card=select_fr(page);expect(card.locator('.cc-question-content')).to_contain_text('Browser-authored test sentence.');expect(card.locator('.cc-card-actions select')).to_have_value('needs_revision')
     assert not errors,errors
     admin_context.close();bcontext.close();context.close();browser.close()
-print('Practice browser passed: dependent path, full text/table/MathML, no answer prefetch, keyboard Show Answer, bookmark/note/progress persistence, two-student isolation, rich-editor draft/approval, mobile/iPad widths and reduced motion.')
+print('Practice browser passed: direct concept path, full text/table/MathML, no answer prefetch, keyboard Show Answer, bookmark/note/progress persistence, two-student isolation, rich-editor draft/approval, mobile/iPad widths and reduced motion.')
