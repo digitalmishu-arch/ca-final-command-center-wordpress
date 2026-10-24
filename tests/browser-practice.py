@@ -27,7 +27,8 @@ def select_fr(page):
     expect(page.locator('[data-filter=subject_id]')).not_to_have_value('')
     expect(page.locator('[data-filter=chapter_id]')).not_to_have_value('')
     expect(page.locator('[data-filter=unit_id]')).not_to_have_value('')
-    expect(page.locator('.cc-question')).to_have_count(1)
+    try:expect(page.locator('.cc-question')).to_have_count(1)
+    except Exception as error:raise RuntimeError('Question filter feedback: '+page.locator('.cc-feedback').inner_text()+'; path: '+page.locator('.cc-selected-path').inner_text()) from error
     return page.locator('.cc-question')
 
 
@@ -75,7 +76,8 @@ with sync_playwright() as runtime:
     admin.goto(BASE+'/wp-admin/admin.php?page=cafcc-studio',wait_until='networkidle')
     admin.locator('#studio-search').fill('EXISTING-O-')
     admin.wait_for_timeout(500)
-    target=admin.locator('#studio-rows tr').filter(has_text='FR').first
+    review_id=admin.evaluate("""async qid=>{const url=new URL(CAFCCStudio.url+'reviews');url.searchParams.set('search','EXISTING-O-');const r=await fetch(url,{headers:{'X-WP-Nonce':CAFCCStudio.nonce}});const rows=await r.json();const found=rows.items.find(r=>String(r.question_id)===qid);if(!found)throw Error('Exact demo question is absent from Studio');return found.stable_id;}""",qid)
+    target=admin.locator('#studio-rows tr').filter(has_text=review_id)
     target.locator('td button').first.click()
     expect(admin.locator('#studio-panel')).to_be_visible()
     admin.get_by_role('button',name=re.compile('^Approve Question Revision')).click()

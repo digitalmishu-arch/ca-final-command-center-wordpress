@@ -29,7 +29,7 @@ jobs:
         if: matrix.legacy == '0'
         uses: actions/upload-artifact@v4
         with:
-          name: ca-final-command-center-0.4.0
+          name: ca-final-command-center-0.4.1
           path: dist/ca-final-command-center.zip
           if-no-files-found: error
           retention-days: 30
@@ -44,12 +44,14 @@ jobs:
       - name: Install browser test tools on the CI runner only
         run: |
           python3 -m pip install playwright==1.56.0 openpyxl==3.1.5
-          python3 -m playwright install --with-deps chromium
+          python3 -m playwright install --with-deps chromium webkit
       - name: Explorer, Studio, Excel, registration and private-practice browser regressions
-        run: bash tests/run-browser.sh
+        run: CAFCC_TEST_WEBKIT=1 bash tests/run-browser.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: v04-authored-browser-previews
-          path: docs/previews/v04-*.png
+          name: v041-authored-browser-previews
+          path: |
+            docs/previews/v04-*.png
+            docs/previews/v041-*.png
           if-no-files-found: error
           retention-days: 30
