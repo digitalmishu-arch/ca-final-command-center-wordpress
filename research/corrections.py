@@ -58,14 +58,14 @@ def metrics(records, ledger):
         eligible=[]
         for r in records:
             e=applicable(ledger,r['source_sha256'],r['section'],r['reference'],r.get('subreference',''))
-            if e and e['actor']=='owner' and e['decision']=='approved' and field in e.get('labels',{}):eligible.append((r,e['labels'][field]))
+            if e and e['actor']=='owner' and e['decision']=='approved' and field in e.get('labels',{}) and (field!='answer_locations' or e['labels'][field]):eligible.append((r,e['labels'][field]))
         correct=sum(r.get('metric_values',{}).get(field)==expected for r,expected in eligible)
         result[name]={'agreement':correct,'labelled_sample':len(eligible),
                       'percentage':round(correct/len(eligible)*100,2) if eligible else None,
                       'scope':'Owner-labelled fields only; unavailable without an approved benchmark'}
     pending=sum(r.get('owner_state')!='approved' for r in records)
     result['manual_review']={'count':pending,'total':len(records),'percentage':round(pending/len(records)*100,2) if records else None}
-    verified_answers=sum(1 for r in records if (ev:=applicable(ledger,r['source_sha256'],r['section'],r['reference'],r.get('subreference',''))) and ev['actor']=='owner' and ev['decision']=='approved' and 'answer_locations' in ev.get('labels',{}) and ev['labels']['answer_locations']==r.get('metric_values',{}).get('answer_locations'))
+    verified_answers=sum(1 for r in records if (ev:=applicable(ledger,r['source_sha256'],r['section'],r['reference'],r.get('subreference',''))) and ev['actor']=='owner' and ev['decision']=='approved' and ev.get('labels',{}).get('answer_locations') and ev['labels']['answer_locations']==r.get('metric_values',{}).get('answer_locations'))
     result['answer_location_verification_coverage']={'verified':verified_answers,'total':len(records),'percentage':round(verified_answers/len(records)*100,2) if records else None}
     result['global_accuracy']=None
     return result

@@ -162,14 +162,21 @@ def segment(lines, profile=None):
             if not exceptions or exceptions[-1].get('code')!='heading_without_question' or exceptions[-1].get('page')!=l['page']:
                 exceptions.append(dict(code='heading_without_question',page=l['page'],blocking=False))
     if current:
-        last=lines[-1];end(last)
+        last=lines[-1];end({**last,'bbox':[last['bbox'][0],last['bbox'][3]+0.01,last['bbox'][2],last['bbox'][3]+0.02]})
     # Detect options inside the bounded question, not the next question's heading.
     for q in questions:
         if q['scenario'] and q['scenario'].get('end_exclusive'):
             a=q['scenario']['start'];b=q['scenario']['end_exclusive']
             q['private_scenario_text']='\n'.join(l['text'] for l in lines if (l['page'],l['bbox'][1])>=(a['page'],a['bbox'][1]) and (l['page'],l['bbox'][1])<(b['page'],b['bbox'][1]))
         options=re.findall(r'^\s*\(([a-d])\)\s*(.*)',q['private_text'],re.M)
-        q['kind']='mcq' if set(k for k,_ in options)>={'a','b','c','d'} else 'unknown'
+        has_choices=set(k for k,_ in options)>={'a','b','c','d'}
+        stem=re.split(r'^\s*\([a-d]\)',q['private_text'],maxsplit=1,flags=re.M)[0]
+        scenario_range=re.search(r'(?:Q\.?\s*Nos?\.?|Questions?|MCQs?)\s*(\d+)\s*(?:to|–|-)\s*(\d+)',q.get('private_scenario_text',''),re.I)
+        in_range=bool(scenario_range and q['reference'].isdigit() and int(scenario_range[1])<=int(q['reference'])<=int(scenario_range[2]))
+        explicit_choices=(q['section']=='mcq' or (q['heading'] and re.search('Multiple Choice|Independent MCQ',q['heading']['text'],re.I)) or
+                          re.search(r'choose|most appropriate|multiple choice|\bMCQ',q['private_text'],re.I) or '?' in stem or in_range)
+        q['kind']='mcq' if has_choices and explicit_choices else 'unknown'
+        if has_choices and not explicit_choices:q['warnings'].append('Lettered independent requirements are not assumed to be MCQ options; type/subparts require review')
         if q['heading'] and re.search(r'descriptive|subjective',q['heading']['text'],re.I):q['kind']='unknown'
         if q['kind']=='mcq' and q['section'].startswith('questions'):
             q['section']='mcq'
@@ -213,7 +220,22 @@ def answer_candidates(question, lines, profile=None):
         if question_marker(l,profile)!=question['reference']:continue
         if not l['bold']:continue
         found.append({**location(l),'evidence':'left-margin bold answer marker'})
-    return found
+    sub=question.get('subreference','')
+    if not sub:return found
+    matched=[]
+    for parent in found:
+        after=[l for l in lines if (l['page'],l['bbox'][1])>=(parent['page'],parent['bbox'][1])]
+        for l in after:
+            other=question_marker(l,profile)
+            if other and other!=question['reference'] and l['bold']:break
+            # Uppercase Roman table rows remain distinct from lowercase working
+            # notes. Repeated lower-case markers remain multiple candidates.
+            t=l['text'].strip();m=re.match(r'^\(?([IVX]+|[ivx]+|[a-z])\)?[.)]?(?:\s|$)',t)
+            if not m:
+                m=re.match(r'^'+re.escape(question['reference'])+r'\.\s+\(?([IVX]+|[ivx]+|[a-z])\)?[.)]?(?:\s|$)',t)
+            if m and m[1]==sub:
+                matched.append({**location(l),'evidence':'Subquestion marker inside its bounded parent answer region'})
+    return matched
 
 
 def identify(lines, declared):

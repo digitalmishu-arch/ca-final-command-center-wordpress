@@ -56,6 +56,36 @@ class LayoutTests(unittest.TestCase):
         found=e.answer_candidates({'reference':'2'},[line('2. TEST',160,bold=True),line('2. TEST',300,2,True)])
         self.assertEqual(len(found),2)
 
+    def test_subquestion_answer_uses_parent_region_and_original_case(self):
+        lines=[line('1. TEST parent answer',150,bold=True),line('I',180,x=136),line('(i) TEST working note',210,x=165),line('2. TEST next parent',250,bold=True),line('I',280,x=136)]
+        found=e.answer_candidates({'reference':'1','subreference':'I'},lines)
+        self.assertEqual(len(found),1);self.assertEqual(found[0]['bbox'][1],180)
+
+    def test_previous_run_comparison_keeps_section_and_subquestion_identity(self):
+        records=[dict(document_key='doc',section=s,reference='2',subreference=sub,classification={'concept':label}) for s,sub,label in [('mcq','','A'),('descriptive','','B'),('mcq','I','C')]]
+        self.assertEqual(pipeline.previous_record(records,'doc','descriptive','2','')['classification']['concept'],'B')
+        self.assertEqual(pipeline.previous_record(records,'doc','mcq','2','I')['classification']['concept'],'C')
+
+    def test_separate_answer_pair_checks_hash_attempt_paper_and_profile(self):
+        import fitz,hashlib
+        (ROOT/'work').mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT/'work') as d:
+            base=Path(d)
+            def pdf(path,answer=False,attempt='JANUARY 2026'):
+                doc=fitz.open();page=doc.new_page();x=72 if answer else 108
+                for text,y,bold in [('PAPER - 1 '+('SUGGESTED ANSWERS' if answer else 'REVISION TEST PAPERS'),60,False),(attempt+' EXAMINATION',90,False),('SUGGESTED ANSWERS' if answer else 'QUESTIONS',170,True),('1. TEST original answer' if answer else '1. Determine TEST original question requirement.',220,answer)]:page.insert_text((x,y),text,fontname='hebo' if bold else 'helv',fontsize=11)
+                doc.save(path);doc.close()
+            pdf(base/'questions.pdf');pdf(base/'answers.pdf',True)
+            (base/'taxonomy.json').write_text(json.dumps({'nodes':[],'editions':[]}))
+            source=dict(subject='FR',source_type='rtp',attempt='January 2026',path='questions.pdf',document_key='TEST-paired-source',official_url='https://www.icai.org/test-only-questions.pdf',access_authorised=True,access_evidence='TEST authored fixture',expected_questions=1,answer_document=dict(path='answers.pdf',official_url='https://www.icai.org/test-only-answers.pdf',access_authorised=True,access_evidence='TEST authored fixture',layout_profile='generic-question-paper@1'))
+            (base/'manifest.json').write_text(json.dumps({'historical_taxonomy':'taxonomy.json','sources':[source]}))
+            result=pipeline.run(base/'manifest.json',base/'first');self.assertEqual(result['records'],1)
+            row=json.loads((base/'first/review.json').read_text())[0];self.assertGreater(row['end_exclusive']['bbox'][1],row['start']['bbox'][1])
+            self.assertEqual(row['answer_candidates'][0]['source_sha256'],hashlib.sha256((base/'answers.pdf').read_bytes()).hexdigest())
+            self.assertIn('answers.pdf',row['answer_candidates'][0]['official_url'])
+            (base/'answers.pdf').unlink();pdf(base/'answers.pdf',True,'MAY 2026')
+            mismatch=pipeline.run(base/'manifest.json',base/'mismatch');self.assertEqual(mismatch['source_failures'],1);self.assertEqual(mismatch['records'],0)
+
     def test_historical_mismatch_does_not_borrow_latest_edition(self):
         q=dict(heading={'text':'Ind AS 21'},private_text='Determine exchange differences.',kind='unknown')
         t=[dict(title='Unit 2: Ind AS 21',edition_key='may2026',subject_code='FR',node_type='unit',node_key='latest')]
@@ -104,6 +134,10 @@ class LayoutTests(unittest.TestCase):
 
     def test_decimal_table_value_is_not_question(self):
         self.assertIsNone(e.question_marker(line('3.103',180),e.PROFILE))
+
+    def test_lettered_independent_requirements_are_not_mcq_options(self):
+        ls=[heading('QUESTIONS',150),line('1. Examine these independent cases.',180)]+[line('('+k+') Determine TEST requirement.',210+i*25,x=136) for i,k in enumerate('abcd')]+[heading('SUGGESTED ANSWERS',400)]
+        qs,*_=e.segment(ls);self.assertEqual(qs[0]['kind'],'unknown');self.assertTrue(qs[0]['warnings']);self.assertEqual(len(qs[0]['subparts']),4)
 
     def test_source_identification_rtp_mtp_exam_and_answer_role(self):
         self.assertEqual(e.document_evidence('REVISION TEST PAPERS JANUARY 2026 EXAMINATION')['observed_type'],'rtp')

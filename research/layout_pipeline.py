@@ -26,16 +26,28 @@ def private_output(path):
     return out
 
 
+def previous_record(records, document, section, reference, subreference):
+    """Support both PR #3 and v2 sidecars without conflating restarted numbers."""
+    candidates=[r for r in records if r['document_key']==document and r['reference']==reference and r.get('subreference',r.get('subquestion',''))==subreference]
+    exact=[r for r in candidates if r.get('section')==section]
+    legacy=[r for r in candidates if 'section' not in r]
+    selected=exact or legacy
+    return selected[0] if len(selected)==1 else {}
+
+
 def run(manifest_path, output, ledger_path=None, previous_path=None, export_reviewed=False):
     manifest_path=Path(manifest_path).resolve();manifest=json.loads(manifest_path.read_text())
     if len(manifest['sources'])>6:raise ValueError('Reviewed-pilot gate: maximum six sources; no mass-run mode')
     out=private_output(output);stamp=datetime.now(timezone.utc).isoformat()
+    code_hash=hashlib.sha256()
+    for component in ('layout_engine.py','layout_pipeline.py','corrections.py','layout-profiles.json'):
+        code_hash.update(component.encode()+b'\0'+(ROOT/'research'/component).read_bytes()+b'\0')
+    engine_revision=dict(version='2.1.0',code_sha256=code_hash.hexdigest())
     ledger=json.loads(Path(ledger_path).read_text()) if ledger_path else {'version':1,'events':[]}
     corrections.validate(ledger)
     taxonomy=json.loads((manifest_path.parent/manifest['historical_taxonomy']).read_text())
     previous=json.loads(Path(previous_path).read_text()) if previous_path else []
     records=[];exceptions=[];sources=[];comparisons=[];private_segments=[]
-    old_index={(r['document_key'],r['reference'],r.get('subquestion','')):r for r in previous}
     for source in manifest['sources']:
         records_before=len(records);comparison_before=len(comparisons);segments_before=len(private_segments)
         try:
@@ -62,10 +74,27 @@ def run(manifest_path, output, ledger_path=None, previous_path=None, export_revi
             if source['source_type']=='mtp':
                 roman={'i':'1','ii':'2','iii':'3','iv':'4'}
                 canon=lambda v:roman.get(engine.norm(v),engine.norm(v))
-                if canon(source['mtp_series']) not in [canon(v) for v in evidence.get('series',[])]:raise ValueError('MTP series not confirmed against visible source evidence')
+                if {canon(v) for v in evidence.get('series',[])}!={canon(source['mtp_series'])}:raise ValueError('MTP series missing or ambiguous in visible source evidence')
             if evidence.get('role')=='answer_reference':raise ValueError('Answer-only document identified; pair with the exact question paper before matching')
             qs,answer_lines,seg_issues,answer_starts=engine.segment(lines,profile)
             issues+=seg_issues
+            if not qs:issues.append(dict(code='question_markers_unrecovered',blocking=True))
+            answer_hash=sha;answer_url=source['official_url'];answer_match_profile=profile
+            pair=source.get('answer_document')
+            if pair:
+                if not pair.get('access_authorised') or not pair.get('access_evidence') or not csv_tools.official_url(pair.get('official_url','')):raise ValueError('Paired answer PDF requires authorised private access and an official URL')
+                answer_path=(manifest_path.parent/pair['path']).resolve();answer_raw=answer_path.read_bytes()
+                if len(answer_raw)>32*1024*1024 or not answer_raw.startswith(b'%PDF-'):raise ValueError('Invalid paired answer PDF')
+                pair_profile=pair.get('layout_profile',chosen)
+                if pair_profile not in profiles:raise ValueError('Unknown paired-answer layout profile')
+                paired_lines,answer_pages,pair_issues,answer_profile=engine.read_pdf(answer_path,profiles[pair_profile])
+                answer_match_profile=answer_profile
+                pair_evidence=answer_pages[0]['document_evidence']
+                if pair_evidence.get('paper')!=expected_paper or not any(engine.norm(a)==engine.norm(source['attempt']) for a in pair_evidence.get('attempts',[])) or pair_evidence.get('role') not in ('answer_reference','questions_and_answers'):raise ValueError('Paired answer paper/attempt/answer role does not match this question source')
+                if source['source_type']=='mtp' and {canon(v) for v in pair_evidence.get('series',[])}!={canon(source['mtp_series'])}:raise ValueError('Paired MTP answer series mismatch, ambiguity or missing evidence')
+                _,answer_lines,answer_issues,answer_starts=engine.segment(paired_lines,answer_profile)
+                if not answer_starts:raise ValueError('Paired answer-section start not recovered safely')
+                answer_hash=hashlib.sha256(answer_raw).hexdigest();answer_url=pair['official_url'];issues+=pair_issues+answer_issues
             if identification['review_required']:issues.append(dict(code='document_identification_requires_review',blocking=True))
             expected=source.get('expected_questions')
             if expected is not None and len(qs)!=expected:issues.append(dict(code='question_count_mismatch',expected=expected,detected=len(qs),blocking=True))
@@ -85,7 +114,7 @@ def run(manifest_path, output, ledger_path=None, previous_path=None, export_revi
                     classification=engine.classify(item,taxonomy['nodes'],source['subject'],edition)
                     # A correction binds to exact bytes, section and original ref.
                     event=corrections.applicable(ledger,sha,item['section'],item['reference'],item['subreference'])
-                    state='needs_review';warnings=['Provisional academic classification; not permission to reproduce source text']
+                    state='needs_review';warnings=['Provisional academic classification; not permission to reproduce source text']+item.get('warnings',[])
                     proposed=classification
                     if event:
                         state=event['decision']
@@ -97,13 +126,20 @@ def run(manifest_path, output, ledger_path=None, previous_path=None, export_revi
                             classification={**classification,**event.get('classification',{}),'method':'manual override'}
                         if state=='conflict':warnings.append('Conflict / Needs Owner Review')
                     if not classification.get('taxonomy_match'):warnings.append('Historical taxonomy mapping unresolved; May 2026 mapping not substituted')
-                    answers=engine.answer_candidates(item,answer_lines,profile)
+                    answers=engine.answer_candidates(item,answer_lines,answer_match_profile)
+                    answers=[{**a,'source_sha256':answer_hash,'official_url':answer_url} for a in answers]
+                    if event and event['decision']=='approved' and 'answer_locations' in event.get('labels',{}):
+                        chosen_answers=event['labels']['answer_locations']
+                        if chosen_answers and all(a in answers for a in chosen_answers):answers=chosen_answers
+                        elif chosen_answers!=answers:
+                            state='conflict';warnings.append('Previously approved answer location/source differs; explicit owner re-review required')
                     if len(answers)!=1:warnings.append('Answer start absent or ambiguous; no verified answer location')
                     if any(i.get('blocking') for i in issues):warnings.append('Document layout/count exception requires owner boundary review')
                     if source['subject']=='FR' and item['reference']=='19':
                         warnings.append('Private archive Answer 19 predates official corrigendum; reference withheld');answers=[]
                     record=dict(question_identity=engine.identity(sha,item['section'],item['reference'],item['subreference']),
                         source_sha256=sha,document_key=source['document_key'],source_type=source['source_type'],
+                        source_title=source.get('title',''),issue_period=source.get('issue_period',''),marks=None,marks_verified=False,
                         subject=source['subject'],attempt=source['attempt'],mtp_series=source.get('mtp_series',''),
                         section=item['section'],reference=item['reference'],subreference=item['subreference'],
                         start=item['start'],end_exclusive=item['end_exclusive'],heading=item['heading'],scenario=item['scenario'],
@@ -111,22 +147,24 @@ def run(manifest_path, output, ledger_path=None, previous_path=None, export_revi
                         kind=item['kind'],warnings=warnings,owner_state=state,ledger_event=event,
                         review_status='needs_review',publication_status='draft',timestamp=stamp,
                         profile=dict(id=profile['id'],version=profile['version']),official_url=source['official_url'])
+                    record['engine_revision']=engine_revision
                     record['layout_blocked']=any(i.get('blocking') for i in issues)
-                    before=old_index.get((source['document_key'],item['reference'],item['subreference']),{})
-                    record['existing_ai_classification']=before.get('suggested_tags',[])
+                    before=previous_record(previous,source['document_key'],item['section'],item['reference'],item['subreference'])
+                    old_classification=before.get('classification',before.get('suggested_tags',[]))
+                    record['existing_ai_classification']=old_classification
                     record['metric_values']=dict(boundary=dict(start=item['start'],end_exclusive=item['end_exclusive']),
                         chapter_key=next((n['node_key'] for n in classification.get('official_nodes',[]) if n['node_type']=='chapter'),None),
                         unit_topic_keys=sorted(n['node_key'] for n in classification.get('official_nodes',[]) if n['node_type'] in ('unit','topic','subtopic')),
                         answer_locations=answers)
                     comparisons.append(dict(document_key=source['document_key'],section=item['section'],reference=item['reference'],subreference=item['subreference'],
-                        old=before.get('suggested_tags',[]),new=classification,old_page=before.get('pdf_page'),new_start=item['start'],
-                        old_key=before.get('question_key'),new_identity=record['question_identity'],owner_state=state))
-                    private_segments.append(dict(identity=record['question_identity'],text=item['private_text']))
+                        old=old_classification,new=classification,old_page=before.get('pdf_page',before.get('start',{}).get('page')),new_start=item['start'],
+                        old_key=before.get('question_key',before.get('question_identity')),new_identity=record['question_identity'],owner_state=state))
+                    private_segments.append(dict(identity=record['question_identity'],text=item['private_text'],scenario_text=item.get('private_scenario_text','')))
                     for warning in warnings:exceptions.append(dict(document_key=source['document_key'],section=item['section'],reference=item['reference'],subreference=item['subreference'],code=warning,blocking=True))
                     records.append(record)
-            sources.append(dict(document_key=source['document_key'],sha256=sha,pages=len(pages),
+            sources.append(dict(document_key=source['document_key'],title=source.get('title',''),official_url=source['official_url'],sha256=sha,pages=len(pages),
                 identification=identification,profile=profile,questions=len(qs),answer_section_starts=answer_starts,
-                notes=source.get('notes',''),timestamp=stamp))
+                notes=source.get('notes',''),timestamp=stamp,answer_source_sha256=answer_hash,answer_official_url=answer_url))
         except (ValueError,OSError) as e:
             records=records[:records_before];comparisons=comparisons[:comparison_before];private_segments=private_segments[:segments_before]
             exceptions.append(dict(document_key=source.get('document_key'),code=str(e),blocking=True))
@@ -136,7 +174,7 @@ def run(manifest_path, output, ledger_path=None, previous_path=None, export_revi
         if (event['source_sha256'],event['section'],event['reference'],event.get('subreference','')) not in applied:
             exceptions.append(dict(source_sha256=event['source_sha256'],section=event['section'],reference=event['reference'],code='Owner correction has unresolved source section/numbering; not applied',blocking=True,event_hash=event['event_hash']))
     concept_records=[r for r in records if r['ledger_event'] and r['ledger_event']['decision']=='concept_approved']
-    report=dict(engine_version='2.0.0',timestamp=stamp,sources=sources,records=len(records),
+    report=dict(engine_version=engine_revision['version'],engine_code_sha256=engine_revision['code_sha256'],timestamp=stamp,sources=sources,records=len(records),
         source_failures=len(manifest['sources'])-len(sources),
         exceptions=len(exceptions),metrics=metrics,bulk_gate='closed_until_owner_reviewed_pilot',
         previous_run_sha256=hashlib.sha256(Path(previous_path).read_bytes()).hexdigest() if previous_path else None,
@@ -176,7 +214,7 @@ def run(manifest_path, output, ledger_path=None, previous_path=None, export_revi
             for n in r['classification']['official_nodes']:
                 hierarchy(n['node_key']);tables['question_topics'].append(csv_tools.ordered('question_topics',dict(question_key=key,node_key=n['node_key'])))
             tables['occurrences'].append(csv_tools.ordered('occurrences',dict(occurrence_key=occ,question_key=key,question_title=r['subject']+' '+r['attempt']+' '+r['section']+' Q'+r['reference'],document_key=doc['document_key'],edition_key=ed,chapter_key=label['chapter_key'],page_reference='PDF p.'+str(r['start']['page']),question_number=r['reference'],subquestion_number=r['subreference'],marks='',marks_verified='0',question_type=r['kind'])))
-            tables['answers'].append(csv_tools.ordered('answers',dict(answer_key=key+'-answer',question_key=key,occurrence_key=occ,answer_mode='official_link',official_url=doc['official_url'],source_location='PDF p.'+str(a['page'])+'; '+r['section']+' Q'+r['reference'])))
+            tables['answers'].append(csv_tools.ordered('answers',dict(answer_key=key+'-answer',question_key=key,occurrence_key=occ,answer_mode='official_link',official_url=a.get('official_url',doc['official_url']),source_location='PDF p.'+str(a['page'])+'; '+r['section']+' Q'+r['reference']+(' ('+r['subreference']+')' if r['subreference'] else ''))))
     for kind,rows in tables.items():
         csv_tools.write_csv(out/('pilot-'+kind+'.csv'),csv_tools.header(kind),rows)
     edition_setup=taxonomy.get('editions',[])
