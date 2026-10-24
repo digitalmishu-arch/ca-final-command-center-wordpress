@@ -265,10 +265,10 @@ def process(inventory, output, limit=None):
             if digest(raw)!=sha:raise ValueError('source_hash_changed')
             _TABLE_CACHE.clear()
             with fitz.open(path) as doc:
-                identity=identify(source,doc);lines=all_lines(doc);sections,profile=boundaries(lines,identity)
+                identity=identify(source,doc);lines=all_lines(doc);sections,profile=boundaries(lines,identity);layout_issues=[]
                 if identity['source_type']=='rtp' and any('Segoe' in l['font'] for l in lines):
                     old_lines,old_pages,old_issues,old_profile=layout.read_pdf(path)
-                    old_qs,answer_lines,old_warnings,answer_starts=layout.segment(old_lines,old_profile)
+                    old_qs,answer_lines,old_warnings,answer_starts=layout.segment(old_lines,old_profile);layout_issues=old_issues+old_warnings
                     if old_qs:
                         # Reuse corrected RTP starts/ends and exact existing IDs.
                         fallback_questions=[q for q in sections if q['side']=='question'];fallback_answers=[q for q in sections if q['side']=='answer']
@@ -297,12 +297,13 @@ def process(inventory, output, limit=None):
                 records=[]
                 for q in sections:
                     for v in [q]+split_parts(q):
+                        v['warnings']=list(v['warnings'])+['layout_exception:'+issue['code'] for issue in layout_issues if issue.get('blocking') and (not issue.get('page') or v['start']['page']<=issue['page']<=v['end_exclusive']['page'])]
                         stable='R-'+layout.identity(sha,v['section'],v['reference'],v['subreference'])
                         records.append({k:v[k] for k in ('section','side','reference','subreference','start','end_exclusive','heading','format','warnings')}|
                             dict(stable_id=stable,parent_shared_context=bool(v.get('shared_parent')),content=rich(v,doc)))
                 sparse=[p.number+1 for p in doc if len(p.get_text().strip())<80]
                 payload=dict(source=source,identity=identity,profile=profile,records=records,pages=len(doc),
-                             exceptions=[dict(code='scanned_or_sparse_page_requires_manual_or_ocr',page=p) for p in sparse],
+                             exceptions=layout_issues+[dict(code='scanned_or_sparse_page_requires_manual_or_ocr',page=p) for p in sparse],
                              processing_outcome='extracted_needs_review' if records else 'blocked_boundaries_not_recovered',
                              engine=VERSION,engine_hash=engine_hash,timestamp=STAMP())
         except Exception as error:payload=dict(source=source,processing_outcome='failed',exceptions=[dict(code=type(error).__name__,reason=str(error))],records=[],timestamp=STAMP())

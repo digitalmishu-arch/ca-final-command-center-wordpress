@@ -1,6 +1,7 @@
 """Three owner decisions and immediate practice, using original fixtures only."""
 from pathlib import Path
 import shutil
+from urllib.parse import unquote
 from playwright.sync_api import sync_playwright, expect
 
 ROOT=Path(__file__).resolve().parents[1];BASE='http://127.0.0.1:8092'
@@ -18,7 +19,7 @@ with sync_playwright() as p:
     expect(admin.locator('.studio-owner-decisions button')).to_have_count(3);expect(admin.locator('[data-owner-action=publish]')).to_have_text('Publish')
     admin.screenshot(path=str(ROOT/'docs/previews/v05-owner-review-ipad.png'),full_page=True)
     admin.locator('[data-owner-action=publish]').click();expect(admin.locator('#studio-detail small')).to_contain_text('approved')
-    student=browser.new_page(viewport={'width':390,'height':844});calls=[];student.on('request',lambda r:calls.append(r.url) if '/answers/' in r.url else None);login(student,'student_a');student.goto(BASE+'/?cafcc_view=explorer',wait_until='networkidle')
+    student=browser.new_page(viewport={'width':390,'height':844});calls=[];student.on('request',lambda r:calls.append(r.url) if '/answers/' in unquote(r.url) else None);login(student,'student_a');student.goto(BASE+'/?cafcc_view=explorer',wait_until='networkidle')
     student.locator('[data-filter=search]').fill('TEST-V05-OWNER');student.wait_for_function("document.querySelector('.cc-question')?.innerText.includes('₹120')")
     card=student.locator('.cc-question');expect(card).to_have_count(1);assert not calls;assert '₹40 per period' not in card.inner_text()
     card.get_by_role('button',name='Show Answer',exact=True).click();expect(card.locator('.cc-answer-panel')).to_contain_text('₹40 per period');assert len(calls)==1
