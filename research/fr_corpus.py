@@ -107,7 +107,7 @@ def boundaries(lines, identity):
     for index, line in enumerate(lines):
         t = line['text'].strip(); upper = t.upper(); change = None
         # Only standalone section headings, never a sentence describing the parts.
-        if re.match(r'^(?:PART\s*[-–:]?\s*(?:I|1|A)\b|SECTION\s*[-–:]?\s*A\b)', upper) and re.search(r'MCQ|MULTIPLE CHOICE|OBJECTIVE', upper): change = 'mcq'
+        if re.match(r'^(?:ANSWERS?\s*(?:OF|TO)?\s*)?(?:PART\s*[-–:]?\s*(?:I|1|A)\b|SECTION\s*[-–:]?\s*A\b)', upper) and re.search(r'MCQ|MULTIPLE CHOICE|OBJECTIVE', upper): change = 'mcq'
         if re.match(r'^(?:ANSWERS?\s+(?:OF\s+)?|SUGGESTED\s+ANSWERS?\s+)?(?:PART\s*[-–:]?\s*(?:II|2|B)\b|SECTION\s*[-–:]?\s*B\b)', upper) and re.search('DESCRIPTIVE|SUBJECTIVE', upper): change = 'descriptive'
         if upper in ('QUESTIONS', 'PART II: QUESTIONS', 'PART II : QUESTIONS') and not section: change = 'questions'
         if re.match(r'^SUGGESTED\s+(?:ANSWERS?|HINTS)|^ANSWERS?\s+(?:OF|TO)\s+PART', upper) and (identity['source_type'] == 'rtp' or role == 'answers'):

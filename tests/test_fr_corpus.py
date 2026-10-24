@@ -37,6 +37,16 @@ class FRCorpusTests(unittest.TestCase):
         q={'format':'SUBJECTIVE','lines':rows,'end_exclusive':{'page':1,'bbox':[108,350,400,365],'column':0},'warnings':[]}
         parts=f.split_parts(q);self.assertEqual([p['subreference'] for p in parts],list('abcd'));self.assertTrue(all(p['lines'][0]['text']=='1. TEST common facts' for p in parts))
 
+    def test_answer_number_restarts_keep_mcq_keys_out_of_descriptive_mapping(self):
+        rows=[heading('ANSWERS OF PART I: MCQs',150),line('1. TEST option B',180),heading('ANSWERS OF PART II: DESCRIPTIVE QUESTIONS',240),line('1. TEST worked solution',280)]
+        records,_=f.boundaries(rows,self.identity('mtp','answers'))
+        self.assertEqual([(r['section'],r['format']) for r in records],[('mcq','MCQ'),('descriptive','SUBJECTIVE')])
+        import fr_package
+        ident=dict(source_type='mtp',role='answers',subject_confirmed=True,issue_period='July 2025',series='I')
+        doc=dict(identity=ident,records=records);paper=dict(identity={**ident,'role':'questions'})
+        matches=fr_package.match_answers(paper,dict(reference='1',subreference='',format='SUBJECTIVE'),[doc])
+        self.assertEqual(len(matches),1);self.assertEqual(matches[0]['record']['section'],'descriptive')
+
     def test_number_and_negative_sign_fidelity(self):
         self.assertTrue(f.fidelity('₹120 (40) −8 31/03/2026 5%','₹120 (40) −8 31/03/2026 5%')['passed'])
         self.assertFalse(f.fidelity('₹120 −8 5%','₹120 8 5')['passed'])

@@ -39,7 +39,7 @@ def match_answers(document,question,documents):
     candidates=[]
     for doc in pool:
         for answer in doc['records']:
-            if answer['side']=='answer' and answer['reference']==question['reference'] and answer['subreference']==question['subreference']:
+            if answer['side']=='answer' and not(question.get('format')=='SUBJECTIVE' and answer.get('format')=='MCQ') and answer['reference']==question['reference'] and answer['subreference']==question['subreference']:
                 candidates.append(dict(document=doc,record=answer))
     return candidates
 
@@ -145,7 +145,7 @@ def build(root,output,previous_path=None):
             if q['side']!='question':continue
             if q['stable_id'] in seen:duplicates.append(dict(stable_id=q['stable_id'],file_id=source['file_id'],code='duplicate_candidate_identity_held'));continue
             seen.add(q['stable_id'])
-            if q['format']=='MCQ':mcq.append(dict(source=inv,record=q));continue
+            if q['format']=='MCQ':mcq.append(dict(source=inv,record=q,previous_classification=previous.get(q['stable_id'],{}).get('classification'),owner_correction=previous.get(q['stable_id'],{}).get('ledger_event')));continue
             if q['format']!='SUBJECTIVE':mixed.append(dict(source=inv,record=q));continue
             candidates=match_answers(d,q,docs);cl=classification(d,q,taxonomy,previous);warnings=list(ident['warnings'])+list(q['warnings'])+list(q['content']['warnings'])
             if len(candidates)!=1:warnings.append('answer_absent_or_multiple_candidates')
@@ -184,7 +184,7 @@ def build(root,output,previous_path=None):
     for item in extra+official:exceptions.append(dict(file_id=item.get('file_id','not_in_drive_catalogue'),filename=item.get('filename',''),source_url=item.get('source_url',''),code=item['outcome'],required_action=item['required_action']))
     for row in rows:
         for warning in row['import_record']['blocking_exceptions']:exceptions.append(dict(stable_id=row['import_record']['stable_id'],file_id=row['source']['file_id'],filename=row['source']['filename'],code=warning,required_action='Private source/answer/classification review required; no publication approval is conveyed.'))
-    write(out/'source-inventory.json',inventory+extra+official);write(out/'fr-official-hierarchy.json',taxonomy);write(out/'subjective-candidates.json',rows);write(out/'preserved-mcq-research.json',mcq);write(out/'mixed-review-hold.json',mixed);write(out/'duplicate-exceptions.json',duplicates);write(out/'exceptions.json',exceptions)
+    write(out/'private-source-register.json',[dict(file_id=d['source']['file_id'],filename=d['source']['filename'],private_drive_url=d['source']['private_url'],source_sha256=d['source']['source_sha256'],title_evidence=d['identity']['title_evidence'],identification_warnings=d['identity']['warnings'],private_owner_review_only=True) for d in docs]);write(out/'source-inventory.json',inventory+extra+official);write(out/'fr-official-hierarchy.json',taxonomy);write(out/'subjective-candidates.json',rows);write(out/'preserved-mcq-research.json',mcq);write(out/'mixed-review-hold.json',mixed);write(out/'duplicate-exceptions.json',duplicates);write(out/'exceptions.json',exceptions)
     import_files=batches([r['import_record'] for r in rows],out/'imports','studio-drafts');hierarchy_files=batches(taxonomy['nodes'],out/'taxonomy-imports','official-hierarchy',max_rows=100,key='nodes',extra={'editions':taxonomy['editions']})
     books=[]
     for i in range(0,len(rows),150):books.append(workbook(rows[i:i+150],docs,taxonomy,[e for e in exceptions if not e.get('stable_id')],out,len(books)+1,inventory+extra+official))

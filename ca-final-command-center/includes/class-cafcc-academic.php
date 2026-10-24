@@ -214,7 +214,7 @@ final class CAFCC_Academic {
     }
 
     public static function path_published($node_id) {
-        for ($depth=0;$node_id && $depth<8;$depth++) {
+        for ($depth=0;$node_id && $depth<12;$depth++) {
             $node=self::get('taxonomy',$node_id);
             if (!self::row_published($node) || !self::row_published(self::get('editions',$node['edition_id']))) { return false; }
             $node_id=$node['parent_id'];
