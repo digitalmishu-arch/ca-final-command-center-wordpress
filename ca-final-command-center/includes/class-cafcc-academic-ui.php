@@ -83,7 +83,7 @@ final class CAFCC_Academic_UI {
         wp_enqueue_style('cafcc-v2',plugins_url('assets/explorer.css',CAFCC_FILE),array(),CAFCC_VERSION);
         $handle=$admin?'cafcc-manager':'cafcc-explorer';
         wp_enqueue_script($handle,plugins_url('assets/'.($admin?'manager.js':'explorer.js'),CAFCC_FILE),array(),CAFCC_VERSION,true);
-        $config=array('url'=>esc_url_raw(rest_url('cafcc/v2/')),'v1'=>esc_url_raw(rest_url('cafcc/v1/')),'practice'=>esc_url_raw(rest_url('cafcc/v3/')),'nonce'=>wp_create_nonce('wp_rest'));
+        $config=array('url'=>esc_url_raw(rest_url($admin?'cafcc/v2/':'cafcc/v4/')),'v1'=>esc_url_raw(rest_url('cafcc/v1/')),'practice'=>esc_url_raw(rest_url('cafcc/v3/')),'nonce'=>wp_create_nonce('wp_rest'));
         if($admin){$config['definitions']=CAFCC_Academic::definitions();$config['templates']=CAFCC_Import::templates();}
         wp_localize_script($handle,$admin?'CAFCCManager':'CAFCCExplorer',$config);
     }
@@ -92,15 +92,15 @@ final class CAFCC_Academic_UI {
         if (!is_user_logged_in() || !current_user_can('read')) {return '<div class="cafcc"><p>Please <a href="'.esc_url(wp_login_url(get_permalink())).'">sign in</a> to access your CA Final dashboard.</p></div>';}
         self::assets();ob_start(); ?>
         <section class="cafcc-v2" data-cafcc-explorer aria-label="CA Final Command Center">
-            <header class="cc-hero"><div><span class="cc-eyebrow">CA FINAL · YOUR STUDY WORKSPACE</span><h2>Build clarity.<br>Practise with purpose.</h2><p>Follow your syllabus. Work through reviewed questions. Make the next step yours.</p></div><span class="cc-version">Version 0.3</span></header>
+            <header class="cc-hero"><div><span class="cc-eyebrow">CA FINAL · YOUR STUDY WORKSPACE</span><h2>Build clarity.<br>Practise with purpose.</h2><p>Follow your syllabus. Work through reviewed questions. Make the next step yours.</p></div><span class="cc-version">Version 0.4</span></header>
             <div class="cc-summary" aria-label="Your practice progress"></div>
-            <div class="cc-workspace"><aside class="cc-filters"><div class="cc-section-title"><h3>Your study path</h3><button type="button" class="cc-reset cc-quiet">Reset</button></div>
+            <div class="cc-workspace"><aside class="cc-filters"><div class="cc-section-title"><h3>Explore any concept</h3><button type="button" class="cc-reset cc-quiet">Clear All</button></div>
                 <?php foreach(array('subject_id'=>'Subject','edition_id'=>'Syllabus edition','chapter_id'=>'Chapter','unit_id'=>'ICAI unit','topic_id'=>'Topic','subtopic_id'=>'Subtopic') as $key=>$label): ?>
-                    <label><?php echo esc_html($label); ?><select data-filter="<?php echo esc_attr($key); ?>" aria-label="<?php echo esc_attr($label); ?>"><option value="">All <?php echo esc_html(strtolower($label)); ?></option></select></label>
+                    <label><?php echo esc_html($label); ?><?php if(in_array($key,array('chapter_id','unit_id','topic_id','subtopic_id'),true)): ?><input type="search" data-facet-search="<?php echo esc_attr($key); ?>" placeholder="Search <?php echo esc_attr(strtolower($label)); ?>" aria-label="Search <?php echo esc_attr($label); ?>"><?php endif; ?><select data-filter="<?php echo esc_attr($key); ?>" aria-label="<?php echo esc_attr($label); ?>"><option value="">All <?php echo esc_html(strtolower($label)); ?></option></select></label>
                 <?php endforeach; ?>
                 <p class="cc-edition-note"></p><p class="cc-note">Official headings and editorial tags are labelled separately. Some chapters have no separately listed ICAI units.</p>
-            </aside><main class="cc-results"><div class="cc-section-title"><div><span class="cc-eyebrow">QUESTION LIBRARY</span><h3>Chapter-wise question explorer</h3></div><span class="cc-result-count"></span></div>
-                <p class="cc-selected-path" aria-live="polite"></p><form class="cc-search"><label class="cc-search-label">Search questions<input type="search" data-filter="search" placeholder="Permitted question text, title or number"></label><button type="submit">Search</button></form>
+            </aside><main class="cc-results"><div class="cc-section-title"><div><span class="cc-eyebrow">QUESTION LIBRARY</span><h3>Question Explorer</h3></div><span class="cc-result-count"></span></div>
+                <div class="cc-filter-chips" aria-label="Active filters"></div><label>Find an academic concept<input type="search" class="cc-concept-input" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cc-concept-results" placeholder="Try Embedded Derivatives or Ind AS 115"></label><div id="cc-concept-results" role="listbox" class="cc-concept-results"></div><p class="cc-selected-path" aria-live="polite"></p><form class="cc-search"><label class="cc-search-label">Search questions<input type="search" data-filter="search" placeholder="Concept, Ind AS, permitted question text or reference"></label><button type="submit">Search</button></form>
                 <div class="cc-source-filters"><label>Exam attempt<select data-filter="exam_attempt"><option value="">All available attempts</option></select></label><label>Source<select data-filter="source_type"><option value="">All available sources</option></select></label></div>
                 <label class="cc-checkbox"><input type="checkbox" data-filter="bookmarked" value="1"> My bookmarks only</label>
                 <p class="cc-feedback" role="status" aria-live="polite">Loading your workspace…</p><div class="cc-question-list"></div><nav class="cc-pagination" aria-label="Question pages"></nav>

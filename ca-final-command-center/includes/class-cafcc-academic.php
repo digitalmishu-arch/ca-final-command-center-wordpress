@@ -309,6 +309,7 @@ final class CAFCC_Academic {
             if (false===$result) { return CAFCC_Repository::error('Duplicate key, duplicate source occurrence or invalid academic record.',409); }
             self::reset_cache();
             $record_id=in_array($kind,array('documents','questions'),true)?$id:($id?:$wpdb->insert_id);
+            if ('taxonomy'===$kind && class_exists('CAFCC_Bank_DB')) { $indexed=CAFCC_Bank_DB::rebuild_closure(); if(is_wp_error($indexed))return $indexed; }
             return self::get($kind,$record_id);
         };
         return $inside_transaction?$write():self::transaction($write);
