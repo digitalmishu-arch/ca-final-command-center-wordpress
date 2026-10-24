@@ -21,3 +21,6 @@ docker exec "$practice_preview_wp" php /repo/tests/preview.php
 docker exec -e CAFCC_PRACTICE_DEMO=1 "$practice_preview_wp" php /repo/tests/practice-demo.php
 python3 tests/browser-practice.py
 python3 tests/browser-review-access.py
+
+python3 tests/browser-v041.py
+if [[ "${CAFCC_TEST_WEBKIT:-0}" == 1 ]]; then CAFCC_BROWSER_ENGINE=webkit python3 tests/browser-v041.py; fi

@@ -1,3 +1,9 @@
+# Version 0.4.1 — First Question Pilot fix
+
+Continues unmerged v0.4 PR #9. Start with [root causes and delivery](docs/v041/ROOT-CAUSE-AND-DELIVERY.md) and the [iPad first-pilot instructions](docs/v041/IPAD-FIRST-PILOT.md). New administrator Getting started diagnostics explain the research/import/review/publication separation and next blockers. Browse Syllabus includes reviewed empty paths; Practice Questions remains publication-gated. Dashboard and My Practice now have distinct purposes. A portal-only persistent light/dark control and explicit Safari form colours are included. No schema bump, automatic publication, membership grant or Hostinger deployment.
+
+The private five-reference FR JSON is delivered separately, never bundled in public code/CI. Import it as drafts; your academic approval remains mandatory. CI uses original synthetic question/solution fixtures only. Chromium/WebKit engine testing is distinct from actual iPad Safari and staging acceptance.
+
 # CA Final Command Center — Version 0.4.0
 
 WordPress/PHP/MySQL question-bank foundation, continuing v0.3 PR #5 and integrating the corrected offline research engine from PR #4/#8. No deployment, live payment or automatic academic publication.

@@ -26,12 +26,12 @@
         jump.addEventListener('click', () => root.querySelector('.cc-filters').scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'})); root.append(jump);
         if ('IntersectionObserver' in window) { const observer = new IntersectionObserver(entries => { jump.hidden = entries[0].isIntersecting; }); observer.observe(root.querySelector('.cc-filters')); }
         const feedback = root.querySelector('.cc-feedback'), list = root.querySelector('.cc-question-list'), summary = root.querySelector('.cc-summary'), pager = root.querySelector('.cc-pagination');
-        let page = 1, generation = 0;
+        let page = 1, generation = 0, scope = 'browse';
         const tell = (message, error = false) => { feedback.textContent = message; feedback.classList.toggle('cc-error', error); };
         function params() {
-            const p = new URLSearchParams({page: String(page)});
+            const p = new URLSearchParams({page: String(page),scope});
             Object.entries(fields).forEach(([key, field]) => { if (field.type === 'checkbox') { if (field.checked) p.set(key, '1'); } else if (field.value.trim()) p.set(key, field.value.trim()); });
-            return p.toString();
+            if(root.dataset.view==='practice')p.set('personal',fields.personal?.value||'all');return p.toString();
         }
         function fill(key, rows, first, text) {
             const select = fields[key], selected = select.value;
@@ -47,7 +47,7 @@
             list.replaceChildren(); pager.replaceChildren();
             root.querySelector('.cc-result-count').textContent = data.total + (data.total === 1 ? ' reference' : ' references');
             if (!data.items.length) {
-                const empty = node('section', undefined, 'cc-empty'); empty.append(node('span', 'A CLEAR START', 'cc-eyebrow'), node('h4', 'Your question library is taking shape'), node('p', 'No verified, published questions match this path yet. Try a broader selection or return after the academic records have been reviewed.'));
+                const empty = node('section', undefined, 'cc-empty'); empty.append(node('span', 'A CLEAR START', 'cc-eyebrow'), node('h4', 'Your question library is taking shape'), node('p', root.dataset.view==='practice'?'No eligible questions match your saved practice view yet. Bookmark a published question or save a practice status to begin.':'No verified questions available yet. This reviewed syllabus path remains available to browse. Try another selection or return after question review.'));
                 list.append(empty);
             }
             data.items.forEach(q => {
@@ -55,6 +55,7 @@
                 card.dataset.subject = q.subject_code;
                 card.dataset.questionId = q.id;
                 const head = node('div', undefined, 'cc-card-top'); head.append(node('span', q.subject_code, 'cc-subject cc-subject-' + q.subject_code.toLowerCase()), node('span', q.stable_key, 'cc-stable-id'));
+                const citations=node('div',undefined,'cc-source-citations');(q.source_citations||[]).forEach(c=>{const a=link(c.url,c.authored?'Independently authored example · official syllabus background':c.label);a.classList.add('cc-official-citation');citations.append(a);});card.append(citations);
                 card.append(head, node('h4', q.title), node('p', q.chapter_title + ' · ' + q.syllabus_version, 'cc-meta'));
                 const tags = node('div', undefined, 'cc-tags');
                 q.classifications.forEach(t => tags.append(node('span', t.title + (t.heading_origin === 'editorial' ? ' · Editorial' : ' · ICAI'), 'cc-tag')));
@@ -130,15 +131,15 @@
                     fields.edition_id.disabled = false;
                     fill('exam_attempt', data.exam_attempts, 'All available attempts', s => s); fill('source_type', data.source_types, 'All available sources', s => sourceLabels[s] || s);
                     await Promise.all(['chapter', 'unit', 'topic', 'subtopic'].map(async type => {
-                        const key = type + '_id', filter = new URLSearchParams(params()); filter.set('type', type); ['chapter_id','unit_id','topic_id','subtopic_id','search'].forEach(k => filter.delete(k));
+                        const key = type + '_id', filter = new URLSearchParams(params()); filter.set('type', type);filter.set('scope',scope); ['chapter_id','unit_id','topic_id','subtopic_id','search'].forEach(k => filter.delete(k));
                         const term = root.querySelector('[data-facet-search="' + key + '"]').value; if (term) filter.set('term', term);
                         const result = await api('concepts?' + filter); if (token !== generation) return;
                         const old = fields[key].selectedOptions[0], value = fields[key].value;
-                        fill(key, result.items, 'Any reviewed ' + type, n => n.title + ' · ' + n.subject_code + ' · ' + n.edition_title);
+                        fill(key, result.items, 'Any reviewed ' + type, n => n.title + ' · ' + n.subject_code + ' · ' + n.edition_title + (n.has_questions?'':' · No verified questions yet'));
                         if (value && ![...fields[key].options].some(o => o.value === value) && old) { fields[key].append(old.cloneNode(true)); fields[key].value = value; }
                         fields[key].disabled = false; fields[key]._concepts = result.items;
                     }));
-                    root.querySelector('.cc-edition-note').textContent = 'Start with any filter. Only reviewed paths with eligible questions are offered. Some chapters have no numbered ICAI unit.';
+                    root.querySelector('.cc-edition-note').textContent = 'Start with any filter. Browse Syllabus includes reviewed headings without questions; Practice Questions uses eligible occurrences. Some chapters have no numbered ICAI unit.';
                 }
                 drawChips();
                 const [questions, counts] = await Promise.all([api('questions?' + params()), api('summary?' + params())]); if (token !== generation) return;
@@ -148,7 +149,7 @@
         }
         function drawChips() {
             const chips = root.querySelector('.cc-filter-chips'); chips.replaceChildren();
-            Object.entries(fields).forEach(([key, f]) => { if (!f.value || (f.type === 'checkbox' && !f.checked)) return;
+            Object.entries(fields).forEach(([key, f]) => { if (key==='personal'||!f.value || (f.type === 'checkbox' && !f.checked)) return;
                 const text = f.type === 'checkbox' ? 'Bookmarks' : f.tagName === 'SELECT' ? f.selectedOptions[0]?.textContent : f.value;
                 const chip = node('button', text + ' ×', 'cc-chip'); chip.type = 'button'; chip.setAttribute('aria-label', 'Remove ' + text);
                 chip.addEventListener('click', () => { if (f.type === 'checkbox') f.checked = false; else f.value = ''; page = 1; refresh(); }); chips.append(chip);
@@ -171,18 +172,19 @@
         const input = root.querySelector('.cc-concept-input'), results = root.querySelector('.cc-concept-results');
         input.addEventListener('input', () => { clearTimeout(conceptTimer); const generation = ++conceptGeneration; conceptTimer = setTimeout(async () => {
             results.replaceChildren(); if (input.value.trim().length < 2) { input.setAttribute('aria-expanded','false'); return; }
-            try { const result = await api('concepts?term=' + encodeURIComponent(input.value.trim())); if (generation !== conceptGeneration) return;
-                result.items.forEach(item => { const button = node('button', item.title + ' · ' + item.subject_code + ' · ' + item.edition_title); button.type = 'button'; button.setAttribute('role','option'); button.addEventListener('click', () => chooseConcept(item)); results.append(button); });
-                if (!result.items.length) results.append(node('p','No reviewed questions are available for this concept yet.')); input.setAttribute('aria-expanded','true');
+            try { const result = await api('concepts?scope='+scope+'&term=' + encodeURIComponent(input.value.trim())); if (generation !== conceptGeneration) return;
+                result.items.forEach(item => { const button = node('button', item.title + ' · ' + item.subject_code + ' · ' + item.edition_title+(item.has_questions?'':' · No verified questions yet')); button.type = 'button'; button.setAttribute('role','option'); button.addEventListener('click', () => chooseConcept(item)); results.append(button); });
+                if (!result.items.length) results.append(node('p','No reviewed syllabus path matches yet. Unreviewed drafts stay private.')); input.setAttribute('aria-expanded','true');
             } catch(e) { tell(e.message,true); }
         }, 250); });
         input.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); results.querySelector('button')?.focus(); } if (e.key === 'Escape') { results.replaceChildren(); input.setAttribute('aria-expanded','false'); } });
         results.addEventListener('keydown', e => { const buttons=[...results.querySelectorAll('button')], i=buttons.indexOf(document.activeElement); if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();buttons[(i+(e.key==='ArrowDown'?1:buttons.length-1))%buttons.length]?.focus();}if(e.key==='Escape'){results.replaceChildren();input.focus();input.setAttribute('aria-expanded','false');} });
         root.querySelectorAll('[data-facet-search]').forEach(search => { let timer; search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => refresh(),300); }); });
-        ['exam_attempt', 'source_type','practice_status'].forEach(key => fields[key].addEventListener('change', () => { page = 1; refresh(); }));
+        ['exam_attempt', 'source_type','practice_status',...(fields.personal?['personal']:[])].forEach(key => fields[key].addEventListener('change', () => { page = 1; refresh(); }));
         fields.bookmarked.addEventListener('change', () => { page = 1; refresh(false); });
         root.querySelector('.cc-search').addEventListener('submit', e => { e.preventDefault(); page = 1; refresh(false); });
-        root.querySelector('.cc-reset').addEventListener('click', () => { Object.values(fields).forEach(f => { if (f.type === 'checkbox') f.checked = false; else f.value = ''; }); root.querySelectorAll('[data-facet-search],.cc-concept-input').forEach(f => { f.value=''; }); results.replaceChildren(); root.querySelector('.cc-selected-path').textContent=''; page = 1; refresh(); });
+        root.querySelector('.cc-reset').addEventListener('click', () => { Object.values(fields).forEach(f => { if (f.type === 'checkbox') f.checked = false; else f.value = f===fields.personal?'all':''; }); root.querySelectorAll('[data-facet-search],.cc-concept-input').forEach(f => { f.value=''; }); results.replaceChildren(); root.querySelector('.cc-selected-path').textContent=''; page = 1; refresh(); });
+        root.querySelectorAll('[data-scope]').forEach(b=>b.addEventListener('click',()=>{scope=b.dataset.scope;root.querySelectorAll('[data-scope]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));results.replaceChildren();input.setAttribute('aria-expanded','false');page=1;refresh();}));
         refresh();
     });
 })();

@@ -18,9 +18,13 @@ with sync_playwright() as p:
     assert page.locator('[data-filter=subject_id] option').count()==7
     assert page.locator('[data-filter=topic_id]').is_enabled()
     assert page.locator('.cc-question').count()==0
-    assert 'No verified, published questions' in page.locator('.cc-question-list').inner_text()
+    assert 'No verified questions available yet' in page.locator('.cc-question-list').inner_text()
     page.locator('.cc-concept-input').fill('Embedded Derivatives')
-    page.wait_for_function("document.querySelector('#cc-concept-results').textContent.includes('No reviewed questions')")
+    page.wait_for_function("document.querySelector('#cc-concept-results').textContent.includes('No verified questions yet')")
+    assert page.locator('#cc-concept-results button').count()>0
+    page.locator('[data-scope=practice]').click()
+    page.locator('.cc-concept-input').fill('TEST NAV Embedded Derivatives')
+    page.wait_for_function("document.querySelector('#cc-concept-results').textContent.includes('No reviewed syllabus')")
     assert not page.locator('#cc-concept-results button').count()
     for width in [390,768,1180]:
         page.set_viewport_size({'width':width,'height':900})

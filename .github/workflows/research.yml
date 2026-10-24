@@ -24,6 +24,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_inventory.py' -v
       - name: Source-derived taxonomy proposal guards
         run: python3 -m unittest discover -s tests -p 'test_taxonomy_proposals.py' -v
+      - name: Exact-source private pilot and draft transport guards
+        run: python3 -m unittest discover -s tests -p 'test_first_pilot.py' -v
       - name: Check Python syntax
         run: python3 -m compileall -q research
       - name: Build public research CODE artifact
