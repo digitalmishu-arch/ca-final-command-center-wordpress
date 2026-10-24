@@ -16,7 +16,8 @@ final class CAFCC_Rights {
             permission_sha256 varchar(64) NOT NULL DEFAULT '',
             reviewer_id bigint(20) unsigned NOT NULL DEFAULT 0,
             updated_at datetime NOT NULL,
-            PRIMARY KEY  (id), KEY state_expiry (state,expires_on)
+            PRIMARY KEY  (id),
+            KEY state_expiry (state,expires_on)
         ) ENGINE=InnoDB ".$wpdb->get_charset_collate().';');
         $cols=$wpdb->get_col("SHOW COLUMNS FROM $t");return $cols&&in_array('permission_pdf',$cols,true)?true:CAFCC_Repository::error('Private rights register migration is incomplete.',503);
     }
