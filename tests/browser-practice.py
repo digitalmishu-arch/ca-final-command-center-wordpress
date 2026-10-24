@@ -80,6 +80,7 @@ with sync_playwright() as runtime:
     target=admin.locator('#studio-rows tr').filter(has_text=review_id)
     target.locator('td button').first.click()
     expect(admin.locator('#studio-panel')).to_be_visible()
+    admin.get_by_text('Advanced Review: internal approval fingerprints and legacy reference workflow',exact=True).click()
     admin.get_by_role('button',name=re.compile('^Approve Question Revision')).click()
     expect(admin.locator('#studio-panel [data-action=question_revision]')).to_contain_text('✓')
     admin.get_by_role('button',name='Publish When Eligible',exact=True).click()

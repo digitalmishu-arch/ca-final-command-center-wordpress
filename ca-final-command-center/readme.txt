@@ -3,7 +3,7 @@ Contributors: digitalmishu-arch
 Tags: education, student-progress, academic-references
 Requires at least: 6.6
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.5.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -24,3 +24,6 @@ Connected edition-specific hierarchy, sourced draft starter catalogue, many-to-m
 
 = 0.1.0 =
 Initial academic reference database, administrator CRUD, verification workflow, student explorer, private progress, tests and ZIP packaging.
+
+== 0.5.0 ==
+Additive schema 5; subjective-only gates; private source-wide ICAI permission register; complete authorised rich draft imports; three owner decisions; simple revision-safe Excel decisions; official contents hierarchy batches; retained student features. No raw archive, private permission PDF or source prose is included in this ZIP. All imported research is Needs Review.

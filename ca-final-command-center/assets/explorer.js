@@ -65,7 +65,7 @@
                     const body = node('div', undefined, 'cc-rich-content');
                     // Only rights-reviewed HTML from the server's explicit allowlist.
                     body.innerHTML = content.body_html;
-                    question.append(node('summary', 'Question'), node('p', content.rights_label + ' · ' + content.author_name, 'cc-credit'), body);
+                    question.append(node('summary', 'Question'), node('p', content.rights_label + ' · ' + content.author_name + (content.attribution?' · '+content.attribution:''), 'cc-credit'), body);
                     if (content.mcq_options.length) {
                         const choices = node('fieldset', undefined, 'cc-mcq-options'), group = 'cc-choice-' + q.id + '-' + Math.random().toString(16).slice(2); choices.append(node('legend', 'Choose an option to practise'));
                         content.mcq_options.forEach(o => { const label = node('label'), radio = node('input'); radio.type = 'radio'; radio.name = group; radio.value = o.key; label.append(radio, node('span', o.key + '. ' + o.text)); choices.append(label); }); question.append(choices);
@@ -95,7 +95,7 @@
                         const result = await api('answers/' + q.id + (q.occurrence_id ? '?occurrence_id=' + q.occurrence_id : '')); panel.replaceChildren();
                         if (!result.items.length) panel.append(node('p', result.empty_message));
                         result.items.forEach(a => {
-                            if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body); }
+                            if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.attribution?' · '+a.attribution:'') + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body); }
                             else if (a.mode === 'official_link') panel.append(node('p', 'Official answer · ' + a.source_location), link(a.official_url, 'View Official Answer'));
                             else panel.append(node('strong', a.rights_label), node('p', a.answer_text, 'cc-solution-text'));
                         });
@@ -129,9 +129,9 @@
                     fill('subject_id', data.subjects, 'All subjects', s => s.code + ' — ' + s.name);
                     fill('edition_id', data.editions.filter(e => !fields.subject_id.value || fields.subject_id.selectedOptions[0]?.textContent.startsWith('IBS') || String(e.subject_id) === fields.subject_id.value), 'All reviewed editions', e => e.title);
                     fields.edition_id.disabled = false;
-                    fill('exam_attempt', data.exam_attempts, 'All available attempts', s => s); fill('source_type', data.source_types, 'All available sources', s => sourceLabels[s] || s);
+                    fill('exam_attempt', data.exam_attempts, 'All available attempts', s => s + (data.attempt_metadata?.find(a=>a.value===s)?.has_questions?' · Practice available':' · No verified questions yet')); fill('source_type', data.source_types, 'All available sources', s => sourceLabels[s] || s);
                     await Promise.all(['chapter', 'unit', 'topic', 'subtopic'].map(async type => {
-                        const key = type + '_id', filter = new URLSearchParams(params()); filter.set('type', type);filter.set('scope',scope); ['chapter_id','unit_id','topic_id','subtopic_id','search'].forEach(k => filter.delete(k));
+                        const key = type + '_id', filter = new URLSearchParams(params()); filter.set('type', type);filter.set('scope',scope); const levels=['chapter','unit','topic','subtopic'];levels.slice(levels.indexOf(type)).map(k=>k+'_id').concat(['search']).forEach(k => filter.delete(k));
                         const term = root.querySelector('[data-facet-search="' + key + '"]').value; if (term) filter.set('term', term);
                         const result = await api('concepts?' + filter); if (token !== generation) return;
                         const old = fields[key].selectedOptions[0], value = fields[key].value;

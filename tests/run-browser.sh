@@ -23,4 +23,6 @@ python3 tests/browser-practice.py
 python3 tests/browser-review-access.py
 
 python3 tests/browser-v041.py
-if [[ "${CAFCC_TEST_WEBKIT:-0}" == 1 ]]; then CAFCC_BROWSER_ENGINE=webkit python3 tests/browser-v041.py; fi
+python3 tests/browser-v05.py
+if [[ "${CAFCC_TEST_WEBKIT:-0}" == 1 ]]; then CAFCC_BROWSER_ENGINE=webkit python3 tests/browser-v041.py
+python3 tests/browser-v05.py; fi
