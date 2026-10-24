@@ -77,7 +77,7 @@ final class CAFCC_Explorer {
 
     public static function ancestors($node) {
         $ids=array((int)$node['id']);
-        for ($i=0;!empty($node['parent_id']) && $i<6;$i++) {
+        for ($i=0;!empty($node['parent_id']) && $i<12;$i++) {
             $node=CAFCC_Academic::get('taxonomy',$node['parent_id']); if (!$node) { break; }
             $ids[]=(int)$node['id'];
         }

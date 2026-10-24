@@ -60,7 +60,7 @@ final class CAFCC_Bank_DB {
         if(!is_string($value))return false;for($i=0;$i<6;$i++){if(preg_match('~(?:drive|docs)\.google\.com~i',$value))return true;$next=rawurldecode(html_entity_decode($value,ENT_QUOTES|ENT_HTML5,'UTF-8'));if($next===$value)break;$value=$next;}return (bool)preg_match('~(?:drive|docs)\.google\.com~i',$value);
     }
     public static function transactional(){
-        global $wpdb;$tables=array();foreach(array('closure','aliases','reviews','audit','batches','access','access_events','resources') as $kind)$tables[]=self::table($kind);foreach(array_merge(CAFCC_Academic_DB::entities(),array('subjects','chapters','topics','documents','questions','progress')) as $kind)$tables[]=CAFCC_DB::table($kind);foreach(array('content','revisions','notebook') as $kind)$tables[]=CAFCC_Practice::table($kind);
+        global $wpdb;$tables=array();if((int)get_option('cafcc_db_version')>=5)$tables[]=CAFCC_Rights::table();foreach(array('closure','aliases','reviews','audit','batches','access','access_events','resources') as $kind)$tables[]=self::table($kind);foreach(array_merge(CAFCC_Academic_DB::entities(),array('subjects','chapters','topics','documents','questions','progress')) as $kind)$tables[]=CAFCC_DB::table($kind);foreach(array('content','revisions','notebook') as $kind)$tables[]=CAFCC_Practice::table($kind);
         $placeholders=implode(',',array_fill(0,count($tables),'%s'));$rows=$wpdb->get_results($wpdb->prepare("SHOW TABLE STATUS WHERE Name IN ($placeholders)",$tables),ARRAY_A);if(count($rows)!==count(array_unique($tables)))return CAFCC_Repository::error('Academic transaction tables are incomplete.',503);foreach($rows as $r)if(strtoupper($r['Engine']??'')!=='INNODB')return CAFCC_Repository::error('Review/approval requires InnoDB tables. Existing data is retained; no table engine is automatically converted.',503);return true;
     }
     public static function audit_master($entity,$id,$before,$after){
@@ -75,5 +75,11 @@ final class CAFCC_Bank_DB {
                 $parent=(int)$rows[$parent]->parent_id;$depth++;
             }
         }return true;
+    }
+    /** New leaves need only their own path, not a full catalogue rebuild. */
+    public static function index_node($id){
+        global $wpdb;$t=self::table('closure');$parent=(int)$id;$depth=0;$seen=array();$values=array();$args=array();
+        while($parent){if(isset($seen[$parent])||$depth>12)return CAFCC_Repository::error('Taxonomy cycle/depth requires review.',409);$seen[$parent]=true;$n=CAFCC_Academic::get('taxonomy',$parent);if(!$n)return CAFCC_Repository::error('Taxonomy parent is missing.',409);$values[]='(%d,%d,%d)';array_push($args,$parent,(int)$id,$depth);$parent=(int)$n['parent_id'];$depth++;}
+        return false!==$wpdb->query($wpdb->prepare("INSERT IGNORE INTO $t (ancestor_id,descendant_id,depth) VALUES ".implode(',',$values),$args))?true:CAFCC_Repository::error('Cannot index the new taxonomy path.',500);
     }
 }

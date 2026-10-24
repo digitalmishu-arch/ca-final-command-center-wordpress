@@ -15,18 +15,18 @@ with sync_playwright() as p:
  admin.locator('#studio-search').fill('TEST-ORIGINAL-OWNED');expect(admin.locator('#studio-rows tr')).to_have_count(1)
  admin.locator('#studio-rows tr td button').first.click();expect(admin.locator('#studio-panel')).to_be_visible();expect(admin.locator('#studio-detail')).to_contain_text('Authorised question preview');expect(admin.locator('#studio-detail')).to_contain_text('UNAPPROVED-NEW-SEARCH-WORD')
  admin.get_by_label('My private notes',exact=True).fill('Browser original private review note')
- admin.get_by_role('button',name='Save Draft',exact=True).click();expect(admin.locator('#studio-detail')).to_contain_text('Authorised question preview')
+ admin.get_by_role('button',name='Save Corrections',exact=True).click();expect(admin.locator('#studio-detail')).to_contain_text('Authorised question preview')
  admin.locator('#studio-panel').evaluate('e=>e.scrollTop=0');admin.screenshot(path=str(ROOT/'docs/previews/v04-review-panel-ipad.png'),full_page=True)
  admin.get_by_role('button',name='Close',exact=True).click();admin.locator('#studio-rows input[type=checkbox]').check()
  try:
   with admin.expect_download(timeout=10000) as download:admin.get_by_role('button',name='Download Review Excel',exact=True).click()
  except Exception as error:raise RuntimeError('Download feedback: '+admin.locator('#studio-feedback').inner_text()) from error
  path=ROOT/'work/browser-private-review.xlsx';download.value.save_as(path);book=load_workbook(path);assert len(book.sheetnames)==8
- book['Approval Decisions']['M2']='Browser Excel correction note';edited=ROOT/'work/browser-private-decisions.xlsx';book.save(edited)
+ book['Approval Decisions']['F2']='Browser Excel correction note';edited=ROOT/'work/browser-private-decisions.xlsx';book.save(edited)
  admin.locator('#studio-excel').set_input_files(edited);expect(admin.locator('#studio-upload-preview')).to_be_visible();apply=admin.get_by_role('button',name='Apply validated decisions / draft batch',exact=True);expect(apply).to_be_enabled();apply.click();expect(admin.locator('#studio-upload-preview')).not_to_be_visible()
- admin.locator('#studio-excel').set_input_files([]);admin.locator('#studio-excel').set_input_files(edited);expect(admin.locator('#studio-feedback')).to_contain_text('already applied')
+ admin.locator('#studio-excel').set_input_files([]);admin.locator('#studio-excel').set_input_files(edited);expect(admin.locator('#studio-feedback')).to_contain_text('current WordPress-issued')
  # Excel can be optional: direct Hold/review controls remain usable.
- admin.locator('#studio-rows tr td button').first.click();expect(admin.get_by_label('My private notes',exact=True)).to_have_value('Browser Excel correction note');admin.get_by_role('button',name='Hold',exact=True).click();expect(admin.locator('#studio-detail small')).to_contain_text('hold');admin.get_by_role('button',name='Close',exact=True).click()
+ admin.locator('#studio-rows tr td button').first.click();expect(admin.get_by_label('My private notes',exact=True)).to_have_value('Browser Excel correction note');admin.locator('[data-owner-action=needs_review]').click();expect(admin.locator('#studio-detail small')).to_contain_text('needs_review');admin.get_by_role('button',name='Close',exact=True).click()
  for width in [390,768,1024]:
   admin.set_viewport_size({'width':width,'height':900});assert admin.evaluate('document.documentElement.scrollWidth<=innerWidth'),width
  # Actual frontend registration -> email POST confirmation -> pending -> manual admin grant.

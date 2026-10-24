@@ -1447,7 +1447,8 @@
     },
     "fr-may2026": {
       "from": "2026-05",
-      "source_url": "https://www.icai.org/post/sm-final-p1-may2026"
+      "source_url": "https://www.icai.org/post/sm-final-p1-may2026",
+      "until": "2027-04"
     },
     "afm-may2026": {
       "attempts": [
@@ -1475,6 +1476,10 @@
         "November 2026"
       ],
       "source_url": "https://www.icai.org/post/sm-final-paper5"
+    },
+    "fr-may2027": {
+      "from": "2027-05",
+      "source_url": "https://www.icai.org/post/sm-final-p1-may2027"
     }
   }
 }

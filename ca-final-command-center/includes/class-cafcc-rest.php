@@ -85,7 +85,7 @@ final class CAFCC_REST {
     }
 
     public static function private_response($response, $server, $request) {
-        if ((str_starts_with($request->get_route(), '/cafcc/v1/') || str_starts_with($request->get_route(), '/cafcc/v2/') || str_starts_with($request->get_route(), '/cafcc/v3/') || str_starts_with($request->get_route(), '/cafcc/v4/'))) {
+        if ((str_starts_with($request->get_route(), '/cafcc/v1/') || str_starts_with($request->get_route(), '/cafcc/v2/') || str_starts_with($request->get_route(), '/cafcc/v3/') || str_starts_with($request->get_route(), '/cafcc/v4/') || str_starts_with($request->get_route(), '/cafcc/v5/'))) {
             $response->header('Cache-Control', 'private, no-store, max-age=0');
             $response->header('Vary', 'Cookie, X-WP-Nonce');
         }

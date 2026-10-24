@@ -3,7 +3,7 @@ defined('ABSPATH') || exit;
 
 /** Frontend access screens and navigation. Existing pages are never overwritten. */
 final class CAFCC_Portal {
-    const VIEWS=array('explorer'=>'Question Explorer','dashboard'=>'My Dashboard','practice'=>'My Practice','trends'=>'Trend Analysis','planner'=>'Study Planner','resources'=>'ICAI Resources','membership'=>'Membership','account'=>'My Account','login'=>'Student Login','register'=>'Create Account','forgot'=>'Forgot Password','pending'=>'Pending Approval','verify'=>'Verify Email');
+    const VIEWS=array('explorer'=>'Question Explorer','dashboard'=>'My Dashboard','practice'=>'My Practice','mcq'=>'MCQ Practice','trends'=>'Trend Analysis','planner'=>'Study Planner','resources'=>'ICAI Resources','membership'=>'Membership','account'=>'My Account','login'=>'Student Login','register'=>'Create Account','forgot'=>'Forgot Password','pending'=>'Pending Approval','verify'=>'Verify Email');
     public static function assets(){wp_enqueue_style('cafcc-v2',plugins_url('assets/explorer.css',CAFCC_FILE),array(),CAFCC_VERSION);wp_enqueue_script('cafcc-portal',plugins_url('assets/portal.js',CAFCC_FILE),array(),CAFCC_VERSION,true);}
     public static function init(){
         add_shortcode('cafcc_portal',array(__CLASS__,'render'));
@@ -15,7 +15,7 @@ final class CAFCC_Portal {
     public static function render($atts=array()){
         nocache_headers();self::assets();
         $requested=isset($_GET['cafcc_view'])&&is_string($_GET['cafcc_view'])?sanitize_key(wp_unslash($_GET['cafcc_view'])):($atts['view']??'explorer');$view=isset(self::VIEWS[$requested])?$requested:'explorer';$html='<div class="cafcc-v2 cc-portal"><header class="cc-portal-top"><strong>CA Final Command Center</strong><button type="button" class="cc-theme-toggle" aria-pressed="false" aria-label="Switch to dark mode"><span aria-hidden="true">☾</span> <span class="cc-theme-label">Dark mode</span></button></header><nav class="cc-portal-nav" aria-label="Command Center navigation">';
-        foreach(array_slice(self::VIEWS,0,8,true) as $key=>$title)$html.='<a href="'.esc_url(self::url($key)).'"'.($key===$view?' aria-current="page"':'').'>'.esc_html($title).'</a>';$html.='</nav>';
+        foreach(array_slice(self::VIEWS,0,9,true) as $key=>$title)$html.='<a href="'.esc_url(self::url($key)).'"'.($key===$view?' aria-current="page"':'').'>'.esc_html($title).'</a>';$html.='</nav>';
         if(!is_user_logged_in())$html.='<div class="cc-portal-access-links"><a href="'.esc_url(self::url('login')).'">Student Login</a> · <a href="'.esc_url(self::url('register')).'">Create Account</a> · <a href="'.esc_url(self::url('forgot')).'">Forgot Password</a></div>';
         $notices=array('check_email'=>'If eligible, check your email for the verification link. Access remains pending.','pending_approval'=>'Email confirmed. Your account is awaiting administrator approval.','invalid_link'=>'The verification link is invalid or expired. Request a fresh link.','login_failed'=>'Sign-in failed. Check your email/password or use Forgot Password.','request_failed'=>'The request could not be completed. Registration needs a valid email, name and a password of at least 12 characters.','reset_sent'=>'If an account matches, WordPress will email password-reset instructions.','try_later'=>'Please wait before trying again.','signed_in'=>'You are signed in.');$notice=isset($_GET['cafcc_notice'])&&is_string($_GET['cafcc_notice'])?sanitize_key(wp_unslash($_GET['cafcc_notice'])):'';if(isset($notices[$notice]))$html.='<p class="cc-portal-notice" role="status">'.esc_html($notices[$notice]).'</p>';
         if(in_array($view,array('explorer','dashboard','practice'),true)&&!CAFCC_Access::eligible())$view=is_user_logged_in()?'pending':'login';
@@ -32,7 +32,7 @@ final class CAFCC_Portal {
             if('pending'===$view)$html.='<details><summary>Resend verification email</summary>'.self::form('resend','Resend verification link').'</details>';
             if('membership'===$view)$html.='<p>Access is granted manually in this release. No live payments are enabled. Future plans and verified payment integrations will use the same entitlement checks.</p>';
         }elseif('resources'===$view){$html.=CAFCC_Resources::directory();}
-        elseif(in_array($view,array('trends','planner'),true))$html.='<p>Coming Soon. This module has no verified data or completed functionality to show yet.</p>';
+        elseif(in_array($view,array('trends','planner','mcq'),true))$html.='<p>Coming Soon. This module has no verified data or completed functionality to show yet.</p>';
         return $html.'</section></div>';
     }
     public static function dashboard(){

@@ -142,7 +142,7 @@ final class CAFCC_Academic {
             $edition=self::get('editions',$data['edition_id']);
             if ((int)$edition['subject_id']!==$data['subject_id']) { return CAFCC_Repository::error('Subject and syllabus edition must match.'); }
             $parent=$data['parent_id']?self::get('taxonomy',$data['parent_id']):null;
-            $allowed=array('module'=>array(), 'chapter'=>array('module'), 'unit'=>array('chapter'), 'topic'=>array('unit','chapter'), 'subtopic'=>array('topic'));
+            $allowed=array('module'=>array(), 'chapter'=>array('module'), 'unit'=>array('chapter'), 'topic'=>array('unit','chapter'), 'subtopic'=>array('topic','subtopic'));
             if ((!$parent && in_array($data['node_type'],array('unit','topic','subtopic'),true)) ||
                 ($parent && (!in_array($parent['node_type'],$allowed[$data['node_type']],true) || (int)$parent['edition_id']!==$data['edition_id'] || (int)$parent['subject_id']!==$data['subject_id'])) || ($id && $data['parent_id']===$id)) {
                 return CAFCC_Repository::error('Choose a valid parent in the same subject and edition.');
@@ -214,7 +214,7 @@ final class CAFCC_Academic {
     }
 
     public static function path_published($node_id) {
-        for ($depth=0;$node_id && $depth<8;$depth++) {
+        for ($depth=0;$node_id && $depth<12;$depth++) {
             $node=self::get('taxonomy',$node_id);
             if (!self::row_published($node) || !self::row_published(self::get('editions',$node['edition_id']))) { return false; }
             $node_id=$node['parent_id'];
@@ -311,8 +311,8 @@ final class CAFCC_Academic {
             if (false===$result) { return CAFCC_Repository::error('Duplicate key, duplicate source occurrence or invalid academic record.',409); }
             self::reset_cache();
             $record_id=in_array($kind,array('documents','questions'),true)?$id:($id?:$wpdb->insert_id);
-            if ('taxonomy'===$kind && class_exists('CAFCC_Bank_DB')) { $indexed=CAFCC_Bank_DB::rebuild_closure(); if(is_wp_error($indexed))return $indexed; }
-            if(class_exists('CAFCC_Studio'))CAFCC_Studio::invalidate($kind,$record_id);
+            if ('taxonomy'===$kind && class_exists('CAFCC_Bank_DB')) { $indexed=$old?CAFCC_Bank_DB::rebuild_closure():CAFCC_Bank_DB::index_node($record_id); if(is_wp_error($indexed))return $indexed; }
+            if(($old||$kind!=='taxonomy')&&class_exists('CAFCC_Studio'))CAFCC_Studio::invalidate($kind,$record_id);
             $saved=self::get($kind,$record_id);if(class_exists('CAFCC_Bank_DB')&&!CAFCC_Bank_DB::audit_master($kind,$record_id,$old,$saved))return CAFCC_Repository::error('Cannot retain academic master history.',500);
             return $saved;
         };

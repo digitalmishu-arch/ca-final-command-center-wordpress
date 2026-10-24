@@ -1,3 +1,13 @@
+# Version 0.5 — Financial Reporting subjective review release candidate
+
+Continues PR #10 / V0.4.1. [iPad installation and review](docs/v05/IPAD-INSTALL-AND-REVIEW.md), [migration and architecture](docs/v05/MIGRATION-AND-ARCHITECTURE.md), and [actual coverage / unfinished work](docs/v05/COVERAGE-AND-UNFINISHED.md).
+
+Adds subjective-only server gates, source-wide private ICAI permissions, complete authorised rich draft imports, one owner Publish transaction, Needs Review / Publish / Reject, a simple revision-safe Excel workflow and official numbered contents hierarchy imports. Existing login, entitlements, progress, private notes/bookmarks, Dashboard/My Practice and light/dark mode remain.
+
+All **79 catalogued FR PDFs (1,776 pages)** were processed privately into provisional extraction candidates. The separate private delivery contains the actual data, workbooks, small import batches and exceptions. **No real academic approvals or automatic publications were made. The complete verified FR archive is not finished**: additional official files, exact URLs/revisions, historical taxonomy, transcription fidelity, answer matches and owner decisions remain open. The reported lifetime permission has no invented expiry; its actual written scope must be confirmed privately. No source prose is in this repository, plugin ZIP or public CI.
+
+The retained sections below document earlier versions; the V0.5 guidance takes precedence.
+
 # Version 0.4.1 — First Question Pilot fix
 
 Continues unmerged v0.4 PR #9. Start with [root causes and delivery](docs/v041/ROOT-CAUSE-AND-DELIVERY.md) and the [iPad first-pilot instructions](docs/v041/IPAD-FIRST-PILOT.md). New administrator Getting started diagnostics explain the research/import/review/publication separation and next blockers. Browse Syllabus includes reviewed empty paths; Practice Questions remains publication-gated. Dashboard and My Practice now have distinct purposes. A portal-only persistent light/dark control and explicit Safari form colours are included. No schema bump, automatic publication, membership grant or Hostinger deployment.

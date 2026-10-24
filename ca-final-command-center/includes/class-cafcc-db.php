@@ -2,7 +2,7 @@
 defined('ABSPATH') || exit;
 
 final class CAFCC_DB {
-    const VERSION = '4';
+    const VERSION = '5';
 
     public static function table($entity) {
         global $wpdb;
@@ -127,6 +127,7 @@ final class CAFCC_DB {
         if (is_wp_error($practice)) {return $practice;}
         $bank=CAFCC_Bank_DB::migrate();
         if (is_wp_error($bank)) {return $bank;}
+        $v5=CAFCC_Release_V5::migrate();if(is_wp_error($v5))return $v5;
         update_option('cafcc_db_version', self::VERSION, false);
         return true;
     }

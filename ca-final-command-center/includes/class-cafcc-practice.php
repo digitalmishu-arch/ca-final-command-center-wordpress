@@ -84,7 +84,8 @@ final class CAFCC_Practice {
         if (!in_array($kind,array('question','answer'),true) || !self::visible_question($id)) {return null;}
         $row=$wpdb->get_row($wpdb->prepare("SELECT pc.* FROM $t pc WHERE pc.question_id=%d AND pc.content_kind=%s AND ".self::permitted_sql('pc'),$id,$kind),ARRAY_A);
         if (!$row || (class_exists('CAFCC_Studio')&&!CAFCC_Studio::content_allowed($id,$kind))) {return null;}
-        return array('body_html'=>self::html($row['body_html']),'mcq_options'=>'question'===$kind?json_decode($row['options_json'],true):array(),
+        $attribution='';if(class_exists('CAFCC_Rights')){$rt=CAFCC_Studio::table();$grant_id=$wpdb->get_var($wpdb->prepare("SELECT rights_grant_id FROM $rt WHERE question_id=%d AND publication_status='published' AND rights_grant_id>0 LIMIT 1",$id));$grant=$grant_id?CAFCC_Rights::get($grant_id):null;if($grant)$attribution=$grant['scope']['attribution'];}
+        return array('attribution'=>$attribution,'body_html'=>self::html($row['body_html']),'mcq_options'=>'question'===$kind?json_decode($row['options_json'],true):array(),
             'author_name'=>$row['author_name'],'source_location'=>$row['source_location'],'rights_label'=>'original'===$row['rights_type']?'Independently authored':'Licensed content');
     }
 
@@ -127,7 +128,7 @@ final class CAFCC_Practice {
             if(!in_array($kind,array('question','answer'),true)){return CAFCC_Repository::error('Choose question or answer content.');}
             if($old && ((int)$old['question_id']!==$qid || $old['content_kind']!==$kind)){return CAFCC_Repository::error('Content identity cannot be reassigned.',409);}
             $row=array('question_id'=>$qid,'content_kind'=>$kind);
-            foreach(array('body_html'=>60000,'author_name'=>190,'source_location'=>190,'rights_type'=>24,'rights_basis'=>2000,'rights_expires'=>10) as $field=>$limit){
+            foreach(array('body_html'=>500000,'author_name'=>190,'source_location'=>190,'rights_type'=>24,'rights_basis'=>2000,'rights_expires'=>10) as $field=>$limit){
                 $v=$input[$field]??($old[$field]??('rights_type'===$field?'reference_only':''));
                 if(!is_string($v) || strlen($v)>$limit || (class_exists('CAFCC_Bank_DB')&&CAFCC_Bank_DB::private_reference($v)) || preg_match('~(?:drive|docs)\.google\.com~i',html_entity_decode($v,ENT_QUOTES|ENT_HTML5,'UTF-8'))){return CAFCC_Repository::error('Invalid '.$field.' or private Drive link.');}
                 $row[$field]='body_html'===$field?self::html($v):sanitize_text_field($v);
@@ -170,7 +171,7 @@ final class CAFCC_Practice {
     }
 
     private static function body($r) {
-        if(strlen($r->get_body())>100000){return CAFCC_Repository::error('Request too large.',413);}
+        if(strlen($r->get_body())>700000){return CAFCC_Repository::error('Request too large.',413);}
         $v=$r->get_json_params();return is_array($v) && $v && !array_is_list($v)?$v:CAFCC_Repository::error('Send a JSON object.');
     }
 
