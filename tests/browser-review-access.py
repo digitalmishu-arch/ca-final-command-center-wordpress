@@ -16,7 +16,7 @@ with sync_playwright() as p:
  admin.locator('#studio-rows tr td button').first.click();expect(admin.locator('#studio-panel')).to_be_visible();expect(admin.locator('#studio-detail')).to_contain_text('Authorised question preview');expect(admin.locator('#studio-detail')).to_contain_text('UNAPPROVED-NEW-SEARCH-WORD')
  admin.get_by_label('My private notes',exact=True).fill('Browser original private review note')
  admin.get_by_role('button',name='Save Draft',exact=True).click();expect(admin.locator('#studio-detail')).to_contain_text('Authorised question preview')
- admin.screenshot(path=str(ROOT/'docs/previews/v04-review-panel-ipad.png'),full_page=True)
+ admin.locator('#studio-panel').evaluate('e=>e.scrollTop=0');admin.screenshot(path=str(ROOT/'docs/previews/v04-review-panel-ipad.png'),full_page=True)
  admin.get_by_role('button',name='Close',exact=True).click();admin.locator('#studio-rows input[type=checkbox]').check()
  try:
   with admin.expect_download(timeout=10000) as download:admin.get_by_role('button',name='Download Review Excel',exact=True).click()
