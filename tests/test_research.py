@@ -79,9 +79,9 @@ class ResearchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Authorised'):p.check_manifest(source)
 
     def test_output_must_be_private_and_new(self):
-        with self.assertRaises(ValueError):p.run('missing','research/public-export')
+        with self.assertRaises(ValueError):p.legacy_run('missing','research/public-export')
         with tempfile.TemporaryDirectory(dir=ROOT/'work') as existing:
-            with self.assertRaises(ValueError):p.run('missing',existing)
+            with self.assertRaises(ValueError):p.legacy_run('missing',existing)
 
     def test_prose_is_not_serialized_by_extractor(self):
         rows,_=p.extract('QUESTIONS\n1. SECRET TEST PROSE\nSUGGESTED ANSWERS\n1. SECRET SOLUTION\n','FR')
@@ -103,7 +103,7 @@ class ResearchTests(unittest.TestCase):
             (temp/'manifest.json').write_text(json.dumps(manifest))
             text='FINANCIAL REPORTING\nREVISION TEST PAPERS\nJANUARY 2026 EXAMINATION\nQUESTIONS\n1. PRIVATE TEST QUESTION\n2. PRIVATE TEST QUESTION\n\fSUGGESTED ANSWERS\n1. PRIVATE TEST ANSWER\n2. PRIVATE TEST ANSWER\n\f'
             with mock.patch.object(p.subprocess,'run',return_value=SimpleNamespace(stdout=text.encode())):
-                report=p.run(temp/'manifest.json',temp/'output')
+                report=p.legacy_run(temp/'manifest.json',temp/'output')
             combined=''.join(f.read_text() for f in (temp/'output').iterdir())
             return report,combined
 

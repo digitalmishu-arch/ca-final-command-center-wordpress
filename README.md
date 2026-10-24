@@ -113,4 +113,4 @@ The sourced starter catalogue does not provide exhaustive detailed topics/subtop
 License: GPL-2.0-or-later.
 ## Private RTP research pipeline
 
-The offline [RTP research proof of concept](docs/RESEARCH-PIPELINE.md) prepares metadata-only Draft/Needs Review CSVs for the existing V0.2 importer. It preserves the WordPress foundation and requires no plugin update or Hostinger action. Actual PDFs/research outputs stay private; GitHub contains tools, documentation and synthetic tests only.
+The offline [layout-aware research workflow](docs/RESEARCH-ACCURACY.md) replaces the PR #3 text-only segmentation, adds private boundary evidence and a persistent owner corrections ledger, and gates small Draft/Needs Review import pilots. It preserves the WordPress foundation and requires no plugin update or Hostinger action. Actual PDFs/research outputs stay private; GitHub contains tools, documentation and synthetic tests only.
