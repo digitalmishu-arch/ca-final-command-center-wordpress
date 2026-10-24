@@ -91,7 +91,7 @@
                     panel.hidden = false; answerButton.textContent = 'Hide Answer'; answerButton.setAttribute('aria-expanded', 'true'); panel.setAttribute('aria-busy', 'true');
                     panel.replaceChildren(node('p', 'Loading reviewed answer references…')); answerButton.disabled = true;
                     try {
-                        const result = await api('answers/' + q.id); panel.replaceChildren();
+                        const result = await api('answers/' + q.id + (q.occurrence_id ? '?occurrence_id=' + q.occurrence_id : '')); panel.replaceChildren();
                         if (!result.items.length) panel.append(node('p', result.empty_message));
                         result.items.forEach(a => {
                             if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body); }
@@ -126,29 +126,63 @@
                 if (loadCatalog) {
                     const data = await api('catalog?' + params()); if (token !== generation) return;
                     fill('subject_id', data.subjects, 'All subjects', s => s.code + ' — ' + s.name);
-                    fill('edition_id', data.editions, 'Choose an edition', e => e.title);
-                    fields.edition_id.disabled = !fields.subject_id.value || !data.editions.length;
-                    if (fields.subject_id.value && !fields.edition_id.value && data.editions.length === 1) { fields.edition_id.value = data.editions[0].id; await refresh(true); return; }
-                    for (const [key, rows, first] of [['chapter_id', data.chapters, 'All chapters'], ['unit_id', data.units, data.units.length ? 'All listed units' : 'No separate units listed'], ['topic_id', data.topics, data.topics.length ? 'All topics' : 'No reviewed topics yet'], ['subtopic_id', data.subtopics, data.subtopics.length ? 'All subtopics' : 'No reviewed subtopics yet']]) {
-                        fill(key, rows, first, n => n.title + (n.heading_origin === 'editorial' ? ' · Editorial tag' : ' · ICAI')); fields[key].disabled = !rows.length;
-                    }
+                    fill('edition_id', data.editions.filter(e => !fields.subject_id.value || String(e.subject_id) === fields.subject_id.value), 'All reviewed editions', e => e.title);
+                    fields.edition_id.disabled = false;
                     fill('exam_attempt', data.exam_attempts, 'All available attempts', s => s); fill('source_type', data.source_types, 'All available sources', s => sourceLabels[s] || s);
-                    fields.exam_attempt.disabled = !data.exam_attempts.length; fields.source_type.disabled = !data.source_types.length;
-                    const edition = data.editions.find(e => String(e.id) === fields.edition_id.value);
-                    root.querySelector('.cc-edition-note').textContent = edition ? [edition.edition_month ? 'Edition ' + edition.edition_month : 'Publication month not stated', edition.reprint_month ? 'Reprint ' + edition.reprint_month : '', edition.applicability].filter(Boolean).join(' · ') : 'Choose a subject and its reviewed syllabus edition. Earlier versions remain separate.';
+                    await Promise.all(['chapter', 'unit', 'topic', 'subtopic'].map(async type => {
+                        const key = type + '_id', filter = new URLSearchParams(params()); filter.set('type', type); ['chapter_id','unit_id','topic_id','subtopic_id','search'].forEach(k => filter.delete(k));
+                        const term = root.querySelector('[data-facet-search="' + key + '"]').value; if (term) filter.set('term', term);
+                        const result = await api('concepts?' + filter); if (token !== generation) return;
+                        const old = fields[key].selectedOptions[0], value = fields[key].value;
+                        fill(key, result.items, 'Any reviewed ' + type, n => n.title + ' · ' + n.subject_code + ' · ' + n.edition_title);
+                        if (value && ![...fields[key].options].some(o => o.value === value) && old) { fields[key].append(old.cloneNode(true)); fields[key].value = value; }
+                        fields[key].disabled = false; fields[key]._concepts = result.items;
+                    }));
+                    root.querySelector('.cc-edition-note').textContent = 'Start with any filter. Only reviewed paths with eligible questions are offered. Some chapters have no numbered ICAI unit.';
                 }
-                const selectedPath = ['chapter_id', 'unit_id', 'topic_id', 'subtopic_id'].filter(key => fields[key].value).map(key => fields[key].selectedOptions[0].textContent);
-                root.querySelector('.cc-selected-path').textContent = selectedPath.join(' → ');
+                drawChips();
                 const [questions, counts] = await Promise.all([api('questions?' + params()), api('summary?' + params())]); if (token !== generation) return;
                 drawQuestions(questions); drawSummary(counts); tell('');
             } catch (e) { if (token === generation) tell(e.message, true); }
             finally { if (token === generation) root.removeAttribute('aria-busy'); }
         }
-        chain.forEach((key, index) => fields[key].addEventListener('change', () => { chain.slice(index + 1).forEach(k => { fields[k].value = ''; }); page = 1; refresh(); }));
-        ['exam_attempt', 'source_type'].forEach(key => fields[key].addEventListener('change', () => { page = 1; refresh(false); }));
+        function drawChips() {
+            const chips = root.querySelector('.cc-filter-chips'); chips.replaceChildren();
+            Object.entries(fields).forEach(([key, f]) => { if (!f.value || (f.type === 'checkbox' && !f.checked)) return;
+                const text = f.type === 'checkbox' ? 'Bookmarks' : f.tagName === 'SELECT' ? f.selectedOptions[0]?.textContent : f.value;
+                const chip = node('button', text + ' ×', 'cc-chip'); chip.type = 'button'; chip.setAttribute('aria-label', 'Remove ' + text);
+                chip.addEventListener('click', () => { if (f.type === 'checkbox') f.checked = false; else f.value = ''; page = 1; refresh(); }); chips.append(chip);
+            });
+        }
+        function chooseConcept(item) {
+            fields.subject_id.value = item.subject_id; fields.edition_id.value = item.edition_id;
+            ['chapter_id','unit_id','topic_id','subtopic_id'].forEach(k => { fields[k].value = ''; });
+            item.ancestors.forEach(a => { const f = fields[a.type + '_id']; if (f) { if (![...f.options].some(o => o.value === String(a.id))) f.append(option(a.id, a.title)); f.value = a.id; } });
+            root.querySelector('.cc-selected-path').textContent = item.subject_code + ' · ' + item.edition_title + ' → ' + item.ancestors.map(a => a.title).join(' → ');
+            root.querySelector('.cc-concept-results').replaceChildren(); root.querySelector('.cc-concept-input').setAttribute('aria-expanded','false'); page = 1; refresh();
+        }
+        chain.forEach(key => fields[key].addEventListener('change', () => {
+            if (['subject_id','edition_id'].includes(key)) {
+                ['chapter_id','unit_id','topic_id','subtopic_id'].forEach(k => { fields[k].value = ''; }); if (key === 'subject_id') fields.edition_id.value = '';
+            } else { const item = (fields[key]._concepts || []).find(n => String(n.id) === fields[key].value); if (item) { chooseConcept(item); return; } }
+            page = 1; refresh();
+        }));
+        let conceptTimer, conceptGeneration = 0;
+        const input = root.querySelector('.cc-concept-input'), results = root.querySelector('.cc-concept-results');
+        input.addEventListener('input', () => { clearTimeout(conceptTimer); const generation = ++conceptGeneration; conceptTimer = setTimeout(async () => {
+            results.replaceChildren(); if (input.value.trim().length < 2) { input.setAttribute('aria-expanded','false'); return; }
+            try { const result = await api('concepts?term=' + encodeURIComponent(input.value.trim())); if (generation !== conceptGeneration) return;
+                result.items.forEach(item => { const button = node('button', item.title + ' · ' + item.subject_code + ' · ' + item.edition_title); button.type = 'button'; button.setAttribute('role','option'); button.addEventListener('click', () => chooseConcept(item)); results.append(button); });
+                if (!result.items.length) results.append(node('p','No reviewed questions are available for this concept yet.')); input.setAttribute('aria-expanded','true');
+            } catch(e) { tell(e.message,true); }
+        }, 250); });
+        input.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); results.querySelector('button')?.focus(); } if (e.key === 'Escape') { results.replaceChildren(); input.setAttribute('aria-expanded','false'); } });
+        results.addEventListener('keydown', e => { const buttons=[...results.querySelectorAll('button')], i=buttons.indexOf(document.activeElement); if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();buttons[(i+(e.key==='ArrowDown'?1:buttons.length-1))%buttons.length]?.focus();}if(e.key==='Escape'){results.replaceChildren();input.focus();input.setAttribute('aria-expanded','false');} });
+        root.querySelectorAll('[data-facet-search]').forEach(search => { let timer; search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => refresh(),300); }); });
+        ['exam_attempt', 'source_type'].forEach(key => fields[key].addEventListener('change', () => { page = 1; refresh(); }));
         fields.bookmarked.addEventListener('change', () => { page = 1; refresh(false); });
         root.querySelector('.cc-search').addEventListener('submit', e => { e.preventDefault(); page = 1; refresh(false); });
-        root.querySelector('.cc-reset').addEventListener('click', () => { Object.values(fields).forEach(f => { if (f.type === 'checkbox') f.checked = false; else f.value = ''; }); page = 1; refresh(); });
+        root.querySelector('.cc-reset').addEventListener('click', () => { Object.values(fields).forEach(f => { if (f.type === 'checkbox') f.checked = false; else f.value = ''; }); root.querySelectorAll('[data-facet-search],.cc-concept-input').forEach(f => { f.value=''; }); results.replaceChildren(); root.querySelector('.cc-selected-path').textContent=''; page = 1; refresh(); });
         refresh();
     });
 })();

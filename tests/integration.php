@@ -47,6 +47,7 @@ CAFCC_Admin::init();
 CAFCC_Frontend::init();
 CAFCC_Academic_UI::init();
 CAFCC_Practice::init();
+CAFCC_Facets::init();
 $server = rest_get_server();
 $count = 0;
 function check($condition, $label) {
@@ -189,7 +190,7 @@ check($http_b['status'] === 200 && $http_b['body']['items'][0]['progress_status'
 check(http_api('POST', 'admin/subjects', array('code' => 'NO', 'name' => 'attack'), $student_a)['status'] === 403, 'Actual HTTP blocks student master writes');
 check(http_api('PUT', 'progress/' . $q['id'], array('status' => 'attempted', 'user_id' => $student_b), $student_a)['status'] === 400, 'Actual HTTP rejects forged progress owner');
 check(http_api('GET', 'admin/subjects', null, $admin)['status'] === 200, 'Actual HTTP allows authenticated administrator master access');
-check(str_contains(CAFCC_Frontend::render(), 'Chapter-wise question explorer'), 'Signed-in dashboard renders the explorer');
+check(str_contains(CAFCC_Frontend::render(), 'Question Explorer'), 'Signed-in dashboard renders the explorer');
 wp_set_current_user($admin);
 check(call_api('DELETE', 'admin/questions/' . $q['id'])->get_status() === 409, 'Question deletion cannot destroy existing student progress');
 check(call_api('PATCH', 'admin/documents/' . $document['id'], array('verification_status' => 'rejected'))->get_status() === 200, 'Administrator can revoke source verification');
@@ -218,4 +219,5 @@ check(is_wp_error(CAFCC_DB::migrate()), 'Database downgrade is refused');
 update_option('cafcc_db_version', CAFCC_DB::VERSION);
 require __DIR__ . "/v02.php";
 require __DIR__ . "/v03.php";
+require __DIR__ . "/v04-facets.php";
 echo "\n$count integration assertions passed on WordPress " . get_bloginfo('version') . ', PHP ' . PHP_VERSION . ".\n";
