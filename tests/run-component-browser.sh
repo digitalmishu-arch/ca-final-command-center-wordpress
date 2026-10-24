@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Disposable local browser environment, never an existing WordPress site.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+mkdir -p work
+cleanup_browser() {
+    if [[ -f work/preview-containers.txt ]]; then
+        mapfile -t practice_preview < work/preview-containers.txt
+        if [[ "${practice_preview[0]:-}" == cafcc-test-*-wp && "${practice_preview[1]:-}" == cafcc-test-*-db && "${practice_preview[2]:-}" == cafcc-test-* ]]; then
+            docker rm -fv "${practice_preview[0]}" "${practice_preview[1]}" >/dev/null 2>&1 || true
+            docker network rm "${practice_preview[2]}" >/dev/null 2>&1 || true
+        fi
+        rm -f work/preview-containers.txt
+    fi
+}
+trap cleanup_browser EXIT
+CAFCC_PREVIEW=1 bash tests/run-integration.sh
+python3 tests/browser-component.py

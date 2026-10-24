@@ -8,6 +8,7 @@ final class CAFCC_Review_XLSX {
     private static function xml($s){return htmlspecialchars((string)$s,ENT_XML1|ENT_QUOTES,'UTF-8');}
     private static function col($n){$s='';do{$n--;$s=chr(65+$n%26).$s;$n=intdiv($n,26);}while($n);return $s;}
     public static function encode($sheets){
+        if(!function_exists('wp_tempnam'))require_once ABSPATH.'wp-admin/includes/file.php';
         if(!class_exists('ZipArchive'))return CAFCC_Repository::error('The PHP ZIP extension is required for Excel review. JSON/CSV review remains available.',503);
         $tmp=wp_tempnam('cafcc-review.xlsx');if(!$tmp)return CAFCC_Repository::error('Cannot create a private temporary workbook.',500);$zip=new ZipArchive();$zip->open($tmp,ZipArchive::OVERWRITE);
         try{
@@ -47,6 +48,7 @@ final class CAFCC_Review_XLSX {
     }
     private static function parse_xml($xml){if(!is_string($xml)||preg_match('/<!DOCTYPE|<!ENTITY/i',$xml))throw new RuntimeException('External entities and DTDs are forbidden.');$old=libxml_use_internal_errors(true);try{$doc=simplexml_load_string($xml,'SimpleXMLElement',LIBXML_NONET);if(!$doc)throw new RuntimeException('Invalid workbook XML.');return $doc;}finally{libxml_clear_errors();libxml_use_internal_errors($old);}}
     public static function decode($encoded){
+        if(!function_exists('wp_tempnam'))require_once ABSPATH.'wp-admin/includes/file.php';
         if(!is_string($encoded)||strlen($encoded)>4000000)throw new RuntimeException('Use a workbook under 3 MB.');$bytes=base64_decode($encoded,true);if(false===$bytes||substr($bytes,0,2)!=='PK')throw new RuntimeException('Upload a valid XLSX workbook.');
         if(!class_exists('ZipArchive'))throw new RuntimeException('PHP ZIP extension unavailable.');$tmp=wp_tempnam('cafcc-upload');file_put_contents($tmp,$bytes);$zip=new ZipArchive();
         try{if(true!==$zip->open($tmp))throw new RuntimeException('Invalid ZIP.');$size=0;if($zip->numFiles>150)throw new RuntimeException('Too many workbook parts.');
