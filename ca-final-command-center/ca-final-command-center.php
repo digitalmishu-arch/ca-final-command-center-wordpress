@@ -13,7 +13,7 @@
 defined('ABSPATH') || exit;
 define('CAFCC_VERSION', '0.4.0');
 define('CAFCC_FILE', __FILE__);
-foreach (array('db', 'repository', 'academic-db', 'academic', 'import', 'explorer', 'rest', 'admin', 'frontend', 'academic-ui','practice','practice-ui','bank-db','facets') as $cafcc_component) {
+foreach (array('db', 'repository', 'academic-db', 'academic', 'import', 'explorer', 'rest', 'admin', 'frontend', 'academic-ui','practice','practice-ui','bank-db','facets','studio','review-xlsx') as $cafcc_component) {
     require_once __DIR__ . '/includes/class-cafcc-' . $cafcc_component . '.php';
 }
 register_activation_hook(__FILE__, array('CAFCC_DB', 'activate'));
@@ -27,5 +27,7 @@ add_action('plugins_loaded', function () {
     CAFCC_Academic_UI::init();
     CAFCC_Practice::init();
     CAFCC_Facets::init();
+    CAFCC_Studio::init();
+    CAFCC_Review_XLSX::init();
 });
 // Intentionally no destructive deactivation or uninstall hook.

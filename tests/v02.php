@@ -11,6 +11,7 @@ function v2($method,$path,$data=null,$query=array(),$nonce=true) {
 function record2($kind,$data,$id=0) {
     $r=v2($id?'PATCH':'POST','admin/'.$kind.($id?'/'.$id:''),$data);
     if(200!==$r->get_status()){throw new RuntimeException($kind.': '.wp_json_encode($r->get_data()));}
+    baseline_after_record($kind,$r->get_data());
     return $r->get_data();
 }
 function csv2($kind,$rows) {

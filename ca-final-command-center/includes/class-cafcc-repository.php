@@ -181,7 +181,9 @@ final class CAFCC_Repository {
         if (false === $result) {
             return self::error('The record could not be saved. Check for a duplicate subject code.', 409);
         }
-        return self::get($entity, $id ?: $wpdb->insert_id);
+        $saved_id=$id?:$wpdb->insert_id;
+        if($old && class_exists('CAFCC_Studio'))CAFCC_Studio::invalidate($entity,$saved_id);
+        return self::get($entity,$saved_id);
     }
 
     private static function referenced($entity, $id) {
