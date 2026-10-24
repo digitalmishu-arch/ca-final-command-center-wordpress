@@ -100,6 +100,7 @@ final class CAFCC_Studio {
     }
     public static function stage_valid($row,$stage){
         $d=$row['data'];
+        if('source'===$stage&&$d['source_type']==='exam'&&(preg_match('/^May\s+2020$/i',$d['exam_attempt'])||(preg_match('/^[A-Za-z]+\s+20\d{2}$/D',$d['exam_attempt'])&&strtotime('1 '.$d['exam_attempt'].' UTC')>time())))return 'An actual examination source cannot be the cancelled May 2020 paper or a future examination. Keep real RTP/MTP preparation contexts separate.';
         if('source'===$stage&&(!$d['official_url']||!$d['scheme']||!$d['edition_id']||in_array($d['subject_code'],array('DT','IDT'),true)&&!$d['law_context']))return 'Verify official source, scheme, historical edition and tax applicability.';
         if('source'===$stage&&$d['source_type']!=='other'&&!self::edition_applies($d))return 'The source attempt is outside the sourced edition applicability, or the edition has not been reviewed. Select/review the correct historical edition; no automatic May 2026 mapping is allowed.';
         if('boundary'===$stage&&(!$d['question_page']||!$d['question_coordinates']))return 'Inspect and record the source page and exact question boundary.';

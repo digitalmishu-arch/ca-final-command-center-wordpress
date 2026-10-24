@@ -56,6 +56,11 @@ final class CAFCC_Rights {
         return $r;
     }
     public static function public_guard($alias){$t=self::table();return " AND (($alias.permission_required=0) OR EXISTS(SELECT 1 FROM $t rg WHERE rg.id=$alias.rights_grant_id AND rg.revision=$alias.rights_grant_revision AND rg.state='active' AND (rg.expires_on='' OR rg.expires_on>='".gmdate('Y-m-d')."')))";}
+    /** One unambiguous source-wide scope avoids a repeated per-question licence step. */
+    public static function resolve($data,$lock=false){
+        if(!empty($data['rights_grant_id'])){$g=self::covers($data['rights_grant_id'],$data,'question',$lock);return $g&&self::covers($data['rights_grant_id'],$data,'answer',$lock)?$g:false;}
+        global $wpdb;$t=self::table();$ids=$wpdb->get_col("SELECT id FROM $t WHERE state='active' ORDER BY id LIMIT 101");if(count($ids)>100)return false;$matches=array();foreach($ids as $id){$g=self::covers($id,$data,'question',$lock);if($g&&self::covers($id,$data,'answer',$lock))$matches[]=$g;if(count($matches)>1)return false;}return count($matches)===1?$matches[0]:false;
+    }
     public static function init(){
         add_action('admin_menu',function(){if(CAFCC_Repository::admin_allowed())add_submenu_page('cafcc','Private ICAI Permission Register','Publication Rights','manage_options','cafcc-rights',array(__CLASS__,'screen'));});
         add_action('rest_api_init',function(){$p=function($r){return CAFCC_REST::permission($r,true);};

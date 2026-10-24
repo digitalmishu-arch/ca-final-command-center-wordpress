@@ -25,6 +25,7 @@ final class CAFCC_Release_V5 {
     }
     public static function blockers($r){
         $d=$r['data'];$errors=array();global $wpdb;$bt=CAFCC_Bank_DB::table('batches');if($wpdb->get_var($wpdb->prepare("SELECT id FROM $bt WHERE batch_key=%s AND status='withdrawn'",$r['batch_key'])))$errors[]='Resume the held import batch as drafts before publication.';if(self::format($d)!=='subjective'||($d['question_type']??'')==='mcq'||preg_match('/\bmcq\b|multiple.choice/i',$d['section']??''))$errors[]='Only confirmed SUBJECTIVE records can enter this publication queue. MCQ/mixed research is retained privately.';
+        if(($d['question_type']??'unknown')==='unknown')$errors[]='Review the question type (practical, theory or case) rather than guessing it from its source.';
         foreach(array('source','boundary','classification') as $stage){$e=CAFCC_Studio::stage_valid($r,$stage);if($e)$errors[]=$e;}
         if($d['source_type']==='exam'&&preg_match('/^May\s+2020$/i',$d['exam_attempt']))$errors[]='There was no May 2020 examination paper. Identify the actual source context; cancelled-cycle RTP/MTP materials remain separate.';
         if($d['source_type']==='exam'&&preg_match('/^[A-Za-z]+\s+20\d{2}$/D',$d['exam_attempt'])&&strtotime('1 '.$d['exam_attempt'].' UTC')>time())$errors[]='An actual examination paper cannot be dated in the future.';
@@ -33,7 +34,7 @@ final class CAFCC_Release_V5 {
         foreach(array('subject_code','source_type','exam_attempt','mtp_series') as $field){if(($a[$field]??null)!==($d[$field]??''))$errors[]='Answer identity mismatch or unconfirmed '.$field.'. Pair the same subject, source category, attempt and MTP series.';}
         if(!empty($d['blocking_exceptions']))$errors[]='Resolve these blocking exceptions and save corrections: '.implode('; ',$d['blocking_exceptions']);
         foreach(array('question','answer') as $kind){if(empty($d['rich_content'][$kind]['body_html'])||!trim(wp_strip_all_tags($d['rich_content'][$kind]['body_html']??'')))$errors[]='Attach the complete authorised '.$kind.' content; a reference or page candidate is insufficient for full-text publication.';if(empty($d['rich_content'][$kind]['author_name']))$errors[]='Record the '.$kind.' author/source attribution.';}
-        if($d['rights_mode']==='original'){$grant=null;}else{$grant=CAFCC_Rights::covers($d['rights_grant_id']??0,$d);if(!$grant||!CAFCC_Rights::covers($d['rights_grant_id']??0,$d,'answer'))$errors[]='Select one active source-wide permission covering the question, suggested answer, electronic storage, intended periods and commercial publication.';}
+        if($d['rights_mode']==='original'){$grant=null;}else{$grant=CAFCC_Rights::resolve($d);if(!$grant)$errors[]='Select one active source-wide permission covering the question, suggested answer, electronic storage, intended periods and commercial publication.';}
         return array_values(array_unique($errors));
     }
     public static function decision($id,$input){
@@ -42,8 +43,8 @@ final class CAFCC_Release_V5 {
         $result=CAFCC_Academic::transaction(function()use($id,$input){global $wpdb;$r=CAFCC_Studio::get($id,true);if(!$r)return CAFCC_Repository::error('Review not found.',404);if((string)($input['expected_revision']??'')!==(string)$r['revision'])return CAFCC_Repository::error('Stale review decision. Reload before applying it.',409);
             if($input['action']!=='publish'){$changed=CAFCC_Studio::decision($id,array('expected_revision'=>$r['revision'],'confirmed'=>true,'action'=>$input['action']==='reject'?'reject':'hold'));if(!is_wp_error($changed)&&$input['action']==='needs_review'){if(false===$wpdb->update(CAFCC_Studio::table(),array('status'=>'needs_review'),array('id'=>$id))||!CAFCC_Studio::audit(CAFCC_Studio::get($id),'owner_needs_review_v5'))return CAFCC_Repository::error('Cannot retain owner review state.',500);return CAFCC_Studio::get($id);}return $changed;}
             $errors=self::blockers($r);if($errors)return new WP_Error('cafcc_publication_blocked',implode("\n",$errors),array('status'=>409,'blockers'=>$errors,'review_id'=>$id,'publication_status'=>'draft'));
-            $d=$r['data'];$grant=$d['rights_mode']==='original'?null:CAFCC_Rights::covers($d['rights_grant_id'],$d,'question',true);if($d['rights_mode']!=='original'&&(!$grant||!CAFCC_Rights::covers($d['rights_grant_id'],$d,'answer',true)))return new WP_Error('cafcc_publication_blocked','The source-wide permission changed or does not cover this publication.',array('status'=>409));
-            if($grant){$d['rights_mode']='licensed_public';$d['rights_basis']='Private permission #'.$grant['id'].' revision '.$grant['revision'].': '.$grant['scope']['attribution'];}
+            $d=$r['data'];$grant=$d['rights_mode']==='original'?null:CAFCC_Rights::resolve($d,true);if($d['rights_mode']!=='original'&&!$grant)return new WP_Error('cafcc_publication_blocked','The source-wide permission changed or does not cover this publication.',array('status'=>409));
+            if($grant){$d['rights_grant_id']=(int)$grant['id'];$d['rights_mode']='licensed_public';$d['rights_basis']='Private permission #'.$grant['id'].' revision '.$grant['revision'].': '.$grant['scope']['attribution'];}
             // The owner has inspected both full revisions on this page. Internal
             // fingerprints are still retained; no earlier AI/test approval is used.
             $r['data']=$d;CAFCC_Studio::$writing=true;
