@@ -11,6 +11,9 @@ final class CAFCC_Explorer {
 
     public static function has_connections($kind,$id) {
         global $wpdb;
+        if('questions'===$kind && class_exists('CAFCC_Practice')){
+            foreach(array('content','notebook') as $kind3){$t=CAFCC_Practice::table($kind3);if($wpdb->get_var($wpdb->prepare("SELECT id FROM $t WHERE question_id=%d LIMIT 1",$id))){return true;}}
+        }
         $deps=array('subjects'=>array('taxonomy'=>'subject_id','editions'=>'subject_id','question_subjects'=>'subject_id'),
             'documents'=>array('document_meta'=>'document_id','occurrences'=>'document_id'), 'questions'=>array('question_meta'=>'question_id','occurrences'=>'question_id','answers'=>'question_id','question_tags'=>'question_id'));
         foreach ($deps[$kind]??array() as $entity=>$field) {
@@ -49,6 +52,9 @@ final class CAFCC_Explorer {
             $f[$key]=sanitize_text_field($value);
         }
         if ($f['source_type'] && !in_array($f['source_type'],array('rtp','mtp','exam','study_material','case_study','other'),true)) { return CAFCC_Repository::error('Invalid source filter.'); }
+        $bookmark=$request->get_param('bookmarked')??'0';
+        if(!is_scalar($bookmark) || !in_array((string)$bookmark,array('0','1'),true)){return CAFCC_Repository::error('Invalid bookmark filter.');}
+        $f['bookmarked']='1'===(string)$bookmark;
         $selected=array();
         foreach (array('chapter','unit','topic','subtopic') as $type) {
             $node_id=$f[$type.'_id']; if (!$node_id) { continue; }
@@ -127,8 +133,10 @@ final class CAFCC_Explorer {
             }
         }
         if (!empty($f['search'])) {
-            $like='%'.$wpdb->esc_like($f['search']).'%'; $where.=" AND (q.title LIKE %s OR q.question_number LIKE %s OR qm.stable_key LIKE %s)"; array_push($args,$like,$like,$like);
+            $content=CAFCC_Practice::table('content');
+            $like='%'.$wpdb->esc_like($f['search']).'%'; $where.=" AND (q.title LIKE %s OR q.question_number LIKE %s OR qm.stable_key LIKE %s OR EXISTS (SELECT 1 FROM $content pc WHERE pc.question_id=q.id AND pc.content_kind='question' AND ".CAFCC_Practice::permitted_sql('pc')." AND pc.search_text LIKE %s))"; array_push($args,$like,$like,$like,$like);
         }
+        if(!empty($f['bookmarked'])){$notebook=CAFCC_Practice::table('notebook');$where.=" AND EXISTS (SELECT 1 FROM $notebook nb WHERE nb.question_id=q.id AND nb.user_id=%d AND nb.bookmarked=1)";$args[]=$user_id;}
         if (!empty($f['source_type']) || !empty($f['exam_attempt'])) {
             $occ=''; $old=''; $oa=array(); $la=array();
             foreach (array('source_type','exam_attempt') as $key) {
@@ -153,6 +161,8 @@ final class CAFCC_Explorer {
             $item['occurrences']=self::occurrences($item['id']);
             $item['legacy_reference']=empty($item['edition_id']);
             $item['classifications']=self::tags($item['id']);
+            $item['practice_content']=CAFCC_Practice::public_content((int)$item['id'],'question');
+            $item['notebook']=CAFCC_Practice::notebook((int)$item['id']);
         }
         return array('items'=>$items,'total'=>$total,'per_page'=>20);
     }
@@ -208,7 +218,7 @@ final class CAFCC_Explorer {
     public static function answers($id) {
         global $wpdb;
         $q=CAFCC_DB::table('questions'); $from=CAFCC_Repository::visible_from(); $where=CAFCC_Repository::visible_where();
-        if (!$wpdb->get_var($wpdb->prepare("SELECT q.id $from WHERE $where AND q.id=%d",$id))) { return CAFCC_Repository::error('Published question not found.',404); }
+        if (!CAFCC_Practice::visible_question($id)) { return CAFCC_Repository::error('Published question not found.',404); }
         $a=CAFCC_DB::table('answers');
         $rows=$wpdb->get_results($wpdb->prepare("SELECT a.* FROM $a a WHERE a.question_id=%d AND ".CAFCC_Academic::published('a')." ORDER BY a.id",$id),ARRAY_A);
         $result=array(); $visible_occ=array_map('intval',array_column(self::occurrences($id),'id'));
@@ -220,6 +230,8 @@ final class CAFCC_Explorer {
                 $result[]=array('mode'=>$row['answer_mode'],'answer_text'=>$row['answer_text'],'rights_label'=>'authored'===$row['answer_mode']?'Independently authored solution':'Licensed solution');
             }
         }
+        $permitted=CAFCC_Practice::public_content($id,'answer');
+        if($permitted){array_unshift($result,array_merge(array('mode'=>'permitted_html'),$permitted));}
         return array('items'=>$result,'empty_message'=>'No reviewed solution is available yet.');
     }
 }

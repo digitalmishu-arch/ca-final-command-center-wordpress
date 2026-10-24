@@ -49,6 +49,7 @@ fi
 
 if [[ "${CAFCC_PREVIEW:-0}" == 1 ]]; then
     docker exec "$wp_container" php /repo/tests/preview.php
+    if [[ "${CAFCC_PRACTICE_DEMO:-0}" == 1 ]]; then docker exec -e CAFCC_PRACTICE_DEMO=1 "$wp_container" php /repo/tests/practice-demo.php; fi
     trap - EXIT
     printf '%s\n' "$wp_container" "$db_container" "$run_id" > work/preview-containers.txt
 fi

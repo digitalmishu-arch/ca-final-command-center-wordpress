@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 — permitted practice
+
+Adds schema 3 with rights-reviewed question/answer rich content, immutable identity/revision history and private student notes/bookmarks. Original/licensed text requires separate revision-specific approval; edits revoke it and expiry is enforced at read/search time. Supports tables/MathML, question-only MCQ choices, explicit Show Answer fetch, source-coloured cards, accessible responsive controls and reduced motion. Existing academic hierarchy/importer, question IDs, accounts, private prototype notes and progress remain intact. No research ingestion, demo seeding, deployment or merge.
+
 ## 0.2.0 — 22 October 2026
 
 Extends PR #1 on a separate branch. Adds schema 2 without rewriting old records; six sourced editions and 180 draft hierarchy entries with official/editorial provenance; connected dependent student filters, search and source/attempt filtering; multiple question-topic/subtopic and IBS subject tags; unique appearances and verified marks; stable question metadata, families/comparisons and historical mappings; authored/licensed solutions or link-only official answer references; administrator manager and five CSV preview/import/withdrawal workflows. Includes plain-permalink URL handling, migration/import/relationship/access/filter/browser checks, mobile previews and a versioned GitHub Actions ZIP artifact. No merge, hosting access, payment connection or deployment.

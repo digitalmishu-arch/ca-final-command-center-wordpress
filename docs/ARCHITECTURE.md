@@ -1,4 +1,8 @@
-# Architecture — Version 0.2.0
+# Architecture — Version 0.3.0
+
+The Version 0.2 hierarchy/importer architecture below remains in place. The additional rights-controlled content and student notebook layer is documented in [MIGRATION-0.3.md](MIGRATION-0.3.md). `CAFCC_Practice` owns additive schema 3, explicit per-revision rights approval, sanitised HTML, content history and current-user notebook access. `CAFCC_Practice_UI` adds an administrator editor using WordPress core tools; no external plugin is required. Student question queries include only permitted question text, never answer text. Answers use the existing deliberate-request endpoint, and new notebook/admin operations use the nonce-protected `cafcc/v3` namespace.
+
+## Academic foundation retained from Version 0.2
 
 Version 0.2 extends the complete [Version 0.1 foundation](ARCHITECTURE-0.1.md). The original repository/REST permissions, question identities and progress storage remain in use. No hosting runtime dependency was added.
 
@@ -6,7 +10,7 @@ Version 0.2 extends the complete [Version 0.1 foundation](ARCHITECTURE-0.1.md). 
 
 | Component | Responsibility |
 | --- | --- |
-| `class-cafcc-db.php` | Schema version gate and original six table definitions; invokes additive schema 2 |
+| `class-cafcc-db.php` | Schema version gate and original six table definitions; invokes additive schemas 2 and 3 |
 | `class-cafcc-academic-db.php` | Twelve new tables; idempotent sourced catalogue preparation |
 | `class-cafcc-academic.php` | Typed records, enums, validation, parent/edition relationships, authorization and transactional writes |
 | `class-cafcc-import.php` | Strict CSV templates, transactional preview, owner-bound commit plans, revalidation/locking and soft withdrawal |
@@ -57,7 +61,7 @@ Filter IDs are validated as one real hierarchy path before querying. The deepest
 
 A connected question needs a published verified source occurrence and edition to appear in v2. Source/question review is also checked by the original visibility logic. Batch status is part of visibility in both API versions. Taxonomy paths require reviewed published ancestors. Answers tied to withdrawn occurrences are withheld; official-link mode contains no copied solution text. Authored/licensed text needs a recorded rights basis plus explicit publication.
 
-All identifiers come from internal table/field maps; SQL values use prepared operations. Strings, relations, stable keys, enum values, bounds and request sizes are checked. Browser output uses DOM text rather than injected HTML. Expected duplicate SQL errors are suppressed from response/log output and returned as safe conflicts. Source URLs use the original conservative direct-HTTPS ICAI-host allowlist.
+All identifiers come from internal table/field maps; SQL values use prepared operations. Strings, relations, stable keys, enum values, bounds and request sizes are checked. Metadata uses DOM text; reviewed practice HTML passes an explicit server allowlist on save and read. Expected duplicate SQL errors are suppressed from response/log output and returned as safe conflicts. Source URLs use the original conservative direct-HTTPS ICAI-host allowlist.
 
 CSV imports are append-only, transactionally previewed/revalidated and serialized by a site-specific MySQL advisory lock. Commit tokens are random, short-lived and bound to their administrator; retries return the original batch. A late conflict rolls back all rows in the batch. Withdrawal retains IDs and progress and refuses accidental republication. It is not a full audit/history or data-deletion system.
 

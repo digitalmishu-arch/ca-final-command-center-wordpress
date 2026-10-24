@@ -46,6 +46,7 @@ CAFCC_REST::init();
 CAFCC_Admin::init();
 CAFCC_Frontend::init();
 CAFCC_Academic_UI::init();
+CAFCC_Practice::init();
 $server = rest_get_server();
 $count = 0;
 function check($condition, $label) {
@@ -216,4 +217,5 @@ check(call_api('GET', 'summary')->get_status() === 503, 'Incompatible database v
 check(is_wp_error(CAFCC_DB::migrate()), 'Database downgrade is refused');
 update_option('cafcc_db_version', CAFCC_DB::VERSION);
 require __DIR__ . "/v02.php";
+require __DIR__ . "/v03.php";
 echo "\n$count integration assertions passed on WordPress " . get_bloginfo('version') . ', PHP ' . PHP_VERSION . ".\n";

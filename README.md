@@ -1,8 +1,10 @@
-# CA Final Command Center — WordPress plugin 0.2.0
+# CA Final Command Center — WordPress plugin 0.3.0
+
+Version 0.3 adds rights-reviewed full-text practice, deliberately fetched answers, private student notes/bookmarks and a colourful responsive interface on the tested V0.2 foundation. [Exact iPad staging instructions and content-rights workflow](docs/PRACTICE-0.3.md), [migration report](docs/MIGRATION-0.3.md), and [validation](docs/VALIDATION-0.3.md). The offline research accuracy fixes are a separate pull request. No research text is copied into WordPress and no questions are seeded by this ZIP.
 
 A connected CA Final syllabus and verified-question explorer for WordPress/PHP/MySQL, with vanilla JavaScript and CSS. No Node.js, separate application server, Supabase, payment service or external API is required on Hostinger.
 
-Version 0.2 is based on the complete **Version 0.1.0 implementation in PR #1**, not the older `main` prototype. Development branch: `feat/v0.2.0-connected-explorer`. Its pull request targets `feat/v0.1.0-foundation` so the changes can be reviewed separately. Neither PR is automatically merged or deployed.
+The Version 0.2 foundation is based on the complete **Version 0.1.0 implementation in PR #1**, not the older `main` prototype. Version 0.3 development branch: `feat/v0.3.0-permitted-practice`, based on `feat/v0.2.0-connected-explorer`. The practice pull request targets the tested V0.2 branch so it can be reviewed independently from the research fixes. Neither PR is automatically merged or deployed.
 
 ## What connects to what
 
@@ -12,7 +14,7 @@ Questions retain stable IDs and can have several topic/subtopic tags, several of
 
 Included:
 
-- Versioned additive schema-2 installation and migrations; schema-1 and prototype data retained.
+- Versioned additive schema-3 installation and migrations; schema-1/schema-2 and prototype data retained.
 - Six subjects and a sourced starter catalogue with **6 editions, 180 hierarchy records: 17 module/resource groups, 112 chapter/navigation entries, 45 units, 2 editorial topics and 4 editorial subtopics**.
 - Dependent student filters, exam-attempt/source filters, search, source cards, pagination, four practice states and reviewed answer panels.
 - Administrator taxonomy/resource editor, ordering, historical edition mappings, approval/publication, families/comparisons and non-destructive unpublishing.
@@ -34,10 +36,10 @@ See [source register and limitations](docs/SOURCES.md). For example, [ICAI's FR 
 This repository does not access or modify `demo.cadeepanshuagarwal.in`. Perform these steps yourself only on that protected staging installation.
 
 1. In Hostinger, confirm the target is **staging**, make a current **database and files backup**, and record the restore option. Confirm staging access protection. Search-engine discouragement alone is not privacy.
-2. In Safari, open the successful Version 0.2 GitHub Actions run. Under **Artifacts**, download **`ca-final-command-center-0.2.0`**. GitHub sign-in may be required.
+2. In Safari, open the successful Version 0.3 GitHub Actions run. Under **Artifacts**, download **`ca-final-command-center-0.3.0`**. GitHub sign-in may be required.
 3. In Files → Downloads, tap the downloaded **outer artifact ZIP** to extract it. Inside is **`ca-final-command-center.zip`**. Keep that **inner ZIP compressed**. Do not upload GitHub's Code → Download ZIP source archive.
 4. Sign in to the staging site's WordPress Admin as Administrator. Open **Plugins → Add New Plugin → Upload Plugin → Choose File → Browse**, select the inner `ca-final-command-center.zip`, then tap **Install Now**.
-5. Because Version 0.1 is already installed, WordPress should show the existing plugin and offer **Replace current with uploaded**. Check the new version is **0.2.0**. Replace the plugin and activate it if WordPress leaves it inactive. Do not delete database tables or change the schema-version option.
+5. Because Version 0.1 or 0.2 is already installed, WordPress should show the existing plugin and offer **Replace current with uploaded**. Check the new version is **0.3.0**. Replace the plugin and activate it if WordPress leaves it inactive. Do not delete database tables or change the schema-version option.
 6. Open **CA Final Command Center → Connected academic manager**. Existing Version 0.1 records remain available through the original main menu. The new manager should contain the six researched editions and 180 draft hierarchy records on a clean upgrade.
 7. Review the source URLs, dates and applicability. Under **Review bundled ICAI hierarchy**, choose an edition, confirm you checked the source and publish its official headings. **Editorial nodes remain drafts** and need individual review in the taxonomy editor. The IBS editorial case chapter is approved separately.
 8. Existing shortcode pages continue working: `[ca_final_command_center]` and `[cafcc_dashboard]` are both supported. If creating a test page, do so only within protected staging. WordPress Private pages are not readable by ordinary Subscribers; use hosting-level staging protection when testing Subscriber access.
@@ -84,11 +86,11 @@ Choose the file → **Validate & preview** → inspect the preview → **Import 
 
 ## Security and deployment boundary
 
-Server-side administrator role **and** capability checks protect all master mutations and imports. Every plugin REST request requires a signed-in user, `read` capability and a valid WordPress REST nonce. Students cannot choose the owner of progress writes. Both API versions honor withdrawn source/question batches and send private/no-store headers. SQL values use prepared operations; text/enum/relationship validation and escaped/DOM text output prevent injection.
+Server-side administrator role **and** capability checks protect all master mutations and imports. Every plugin REST request requires a signed-in user, `read` capability and a valid WordPress REST nonce. Students cannot choose the owner of progress writes. All three REST namespaces honor withdrawn source/question batches and send private/no-store headers. SQL values use prepared operations; text/enum/relationship validation and DOM text metadata and allowlisted rich content prevent injection.
 
 Only direct HTTPS ICAI-host resource URLs are accepted, without credentials, query strings, fragments or custom ports. Google Drive URLs are rejected as sources/answers. No private files, credentials or unpublished answer text are exported to student endpoints. The plugin makes no external content-fetching requests.
 
-Deactivation retains all data. Restoring old plugin files alone is not a validated database downgrade: restore the matching **database and files backup** if you need to return to Version 0.1. See [migration report](docs/MIGRATION-0.2.md).
+Deactivation retains all data. Restoring old plugin files alone is not a validated database downgrade: restore the matching **database and files backup** if you need to return to an earlier release. See [schema-3 migration report](docs/MIGRATION-0.3.md).
 
 ## Requirements, tests and previews
 
