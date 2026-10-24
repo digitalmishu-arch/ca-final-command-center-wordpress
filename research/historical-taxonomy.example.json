@@ -1,0 +1,5 @@
+{
+  "editions": [],
+  "nodes": [],
+  "instructions": "Supply sourced, separately keyed editions and nodes for the actual source attempt. Unknown mappings stay empty. Never substitute the May 2026 catalogue for historical sources. Use V0.2 hierarchy fields and record exact source URLs/applicability. Owner review remains required."
+}

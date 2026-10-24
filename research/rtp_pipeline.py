@@ -233,7 +233,7 @@ def ordered(kind, data):
     return {k: str(data.get(k, '')) for k in header(kind)}
 
 
-def run(manifest_path, output):
+def legacy_run(manifest_path, output):
     manifest_path, output = Path(manifest_path).resolve(), Path(output).resolve()
     # Private by default, and impossible to accidentally export into tracked source.
     private = (ROOT / 'work').resolve()
@@ -415,14 +415,24 @@ def run(manifest_path, output):
     return report
 
 
+def run(manifest_path, output, **kwargs):
+    """Safe default: layout engine. Legacy text engine is comparison-only."""
+    from layout_pipeline import run as layout_run
+    return layout_run(manifest_path, output, **kwargs)
+
+
 if __name__ == '__main__':
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('manifest', help='Private local source manifest JSON')
     parser.add_argument('--output', required=True, help='New directory under ignored work/')
+    parser.add_argument('--ledger', help='Persistent private owner corrections ledger')
+    parser.add_argument('--previous', help='Previous private review.json for before/after comparison')
+    parser.add_argument('--export-reviewed',action='store_true',help='Export at most ten fully owner-labelled draft pilot references')
     args = parser.parse_args()
     try:
-        report = run(args.manifest, args.output)
-        raise SystemExit(1 if report['errors'] else 0)
+        report = run(args.manifest, args.output, ledger_path=args.ledger, previous_path=args.previous, export_reviewed=args.export_reviewed)
+        print(json.dumps({'sources':len(report['sources']),'records':report['records'],'bulk_gate':report['bulk_gate']}))
+        raise SystemExit(1 if report['source_failures'] else 0)
     except (ValueError, KeyError, TypeError) as e:
         parser.exit(2, str(e) + '\n')

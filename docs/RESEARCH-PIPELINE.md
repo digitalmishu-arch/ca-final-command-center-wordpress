@@ -1,5 +1,7 @@
 # Private RTP research proof of concept
 
+This document records the original PR #3 text-only baseline. The active command now uses the [layout-aware accuracy workflow](RESEARCH-ACCURACY.md), which replaces its segmentation/classification and adds the owner ledger and pilot gates. Use that guide for new runs.
+
 This adds offline research tools around the tested Version 0.2.0 importer. The plugin, connected hierarchy, review manager, database schema and student experience are unchanged. Python and Poppler run in the research workspace, never on Hostinger. No deployment or plugin replacement is needed for this change.
 
 ## Access and privacy

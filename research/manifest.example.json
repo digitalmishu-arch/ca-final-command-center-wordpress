@@ -1,4 +1,5 @@
 {
+  "historical_taxonomy": "historical-taxonomy.json",
   "edition_setup": [
     {
       "edition_key": "fr-rtp-jan2026-research",
@@ -16,6 +17,8 @@
   "sources": [
     {
       "subject": "FR",
+      "historical_edition_key": "fr-may2025-jan2026",
+      "layout_profile": "icai-bos-single-column@2",
       "path": "sources/FR.pdf",
       "document_key": "fr-jan2026-rtp",
       "edition_key": "fr-rtp-jan2026-research",
