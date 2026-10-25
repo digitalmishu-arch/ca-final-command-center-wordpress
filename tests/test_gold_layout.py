@@ -101,4 +101,29 @@ class GoldLayout(unittest.TestCase):
         self.assertEqual([n['key'] for n in primary],['old-chapter','old-topic']);self.assertFalse(missing)
         self.assertEqual(proposed_paths(['new-topic'],nodes)[2],['new-topic'])
 
+    def test_separate_question_and_answer_files_keep_exact_source_hash(self):
+        from january_pilot import run
+        import tempfile,json
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);sources=[]
+            for key,role,text in [('TEST-PAPER','questions','2. Prepare the TEST original requirement.'),('TEST-SOLUTION','answers','2. TEST exact solution amount 777.')]:
+                path=root/(key+'.pdf')
+                with fitz.open() as d:
+                    p=d.new_page();p.insert_text((72,70),'TEST FINANCIAL REPORTING');p.insert_text((72,130),text);d.save(path)
+                sources.append(dict(key=key,title=key,subject_code='FR',source_type='mtp',source_kind='MTP',role=role,exam_attempt='January 2026',mtp_series='I',source_hash=g.sha(path.read_bytes()),local_path=str(path),official_url='https://www.icai.org/'+key+'.pdf'))
+            sources[0]['answer_document_hash']=sources[1]['source_hash'];manifest=root/'manifest.json';manifest.write_text(json.dumps(dict(edition_key='TEST-only',sources=sources)))
+            run(manifest,root/'out')
+            data=json.loads((root/'out/private-candidates.json').read_text());self.assertEqual(len(data),1);row=data[0]['import_record']
+            self.assertEqual(row['answer']['source_hash'],sources[1]['source_hash']);self.assertEqual(row['answer']['official_url'],sources[1]['official_url']);self.assertIn('777',row['rich_content']['answer']['body_html']);self.assertNotIn('exact solution',row['rich_content']['question']['body_html']);self.assertEqual(json.loads((root/'out/coverage.json').read_text())['publications'],0)
+
+    def test_bad_original_does_not_stop_other_profile_discovery(self):
+        from january_pilot import discover_available
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'TEST.pdf'
+            with fitz.open() as d:
+                p=d.new_page();p.insert_text((72,70),'TEST FINANCIAL REPORTING');p.insert_text((72,120),'2. Prepare TEST original.');d.save(path)
+            good=dict(key='TEST-GOOD',subject_code='FR',source_type='mtp',role='questions',exam_attempt='January 2026',mtp_series='I',source_hash=g.sha(path.read_bytes()),local_path=str(path))
+            bad={**good,'key':'TEST-BAD','source_hash':'0'*64};available,failures=discover_available([bad,good]);self.assertIn('TEST-GOOD',available);self.assertIn('TEST-BAD',failures);self.assertNotIn('TEST-BAD',available)
+
 if __name__=='__main__':unittest.main()
