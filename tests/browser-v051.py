@@ -16,7 +16,7 @@ def login(page,user):
 
 
 def reader(page):
-    page.goto(BASE+'/?cafcc_view=explorer',wait_until='networkidle');page.locator('[data-filter=search]').fill(TARGET);page.locator('[data-filter=search]').press('Enter');card=page.locator('.cc-question');expect(card).to_have_count(1);expect(card.get_by_role('button',name='Start',exact=True)).to_be_enabled();return card
+    page.goto(BASE+'/?cafcc_view=explorer',wait_until='networkidle');page.locator('[data-filter=search]').fill(TARGET);page.locator('[data-filter=search]').press('Enter');card=page.locator('.cc-question');page.wait_for_function("document.querySelector('[data-cafcc-explorer]')&&!document.querySelector('[data-cafcc-explorer]').hasAttribute('aria-busy')");expect(card).to_have_count(1);expect(card.get_by_role('button',name='Start',exact=True)).to_be_enabled();return card
 
 
 with sync_playwright() as p:
