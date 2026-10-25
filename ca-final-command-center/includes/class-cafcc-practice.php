@@ -85,7 +85,7 @@ final class CAFCC_Practice {
         $row=$wpdb->get_row($wpdb->prepare("SELECT pc.* FROM $t pc WHERE pc.question_id=%d AND pc.content_kind=%s AND ".self::permitted_sql('pc'),$id,$kind),ARRAY_A);
         if (!$row || (class_exists('CAFCC_Studio')&&!CAFCC_Studio::content_allowed($id,$kind))) {return null;}
         $attribution='';if(class_exists('CAFCC_Rights')){$rt=CAFCC_Studio::table();$grant_id=$wpdb->get_var($wpdb->prepare("SELECT rights_grant_id FROM $rt WHERE question_id=%d AND publication_status='published' AND rights_grant_id>0 LIMIT 1",$id));$grant=$grant_id?CAFCC_Rights::get($grant_id):null;if($grant)$attribution=$grant['scope']['attribution'];}
-        return array('attribution'=>$attribution,'body_html'=>self::html($row['body_html']),'mcq_options'=>'question'===$kind?json_decode($row['options_json'],true):array(),
+        return array('attribution'=>$attribution,'body_html'=>('question'===$kind?CAFCC_Review_Tools::common_html($id):'').self::html($row['body_html']),'mcq_options'=>'question'===$kind?json_decode($row['options_json'],true):array(),
             'author_name'=>$row['author_name'],'source_location'=>$row['source_location'],'rights_label'=>'original'===$row['rights_type']?'Independently authored':'Licensed content');
     }
 
@@ -102,10 +102,7 @@ final class CAFCC_Practice {
         if (!is_array($data) || !$data || array_diff(array_keys($data),array('note_text','bookmarked'))) {return CAFCC_Repository::error('Send only your note text and/or bookmark.');}
         if (array_key_exists('note_text',$data) && (!is_string($data['note_text']) || strlen($data['note_text'])>10000)) {return CAFCC_Repository::error('Private note must be text up to 10,000 bytes.');}
         if (array_key_exists('bookmarked',$data) && !is_bool($data['bookmarked'])) {return CAFCC_Repository::error('Bookmark must be true or false.');}
-        $value=array('user_id'=>get_current_user_id(),'question_id'=>$id,'note_text'=>isset($data['note_text'])?sanitize_textarea_field($data['note_text']):$current['note_text'],
-            'bookmarked'=>array_key_exists('bookmarked',$data)?(int)$data['bookmarked']:(int)$current['bookmarked'],'updated_at'=>current_time('mysql',true));
-        if(false===$wpdb->replace(self::table('notebook'),$value)){return CAFCC_Repository::error('Cannot save your notebook.',500);}
-        return self::notebook($id);
+        return CAFCC_Academic::transaction(function()use($id,$data){global $wpdb;$t=self::table('notebook');$uid=get_current_user_id();$wpdb->query($wpdb->prepare("INSERT IGNORE INTO $t (user_id,question_id,note_text,bookmarked,updated_at) VALUES (%d,%d,'',0,%s)",$uid,$id,current_time('mysql',true)));$old=$wpdb->get_row($wpdb->prepare("SELECT id FROM $t WHERE user_id=%d AND question_id=%d FOR UPDATE",$uid,$id),ARRAY_A);if(!$old)return CAFCC_Repository::error('Cannot lock your notebook.',500);$v=array('updated_at'=>current_time('mysql',true));if(array_key_exists('note_text',$data))$v['note_text']=sanitize_textarea_field($data['note_text']);if(array_key_exists('bookmarked',$data))$v['bookmarked']=(int)$data['bookmarked'];if(false===$wpdb->update($t,$v,array('id'=>$old['id'])))return CAFCC_Repository::error('Cannot save your notebook.',500);return self::notebook($id);});
     }
 
     private static function audit($row,$event) {

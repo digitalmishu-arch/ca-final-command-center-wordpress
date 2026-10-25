@@ -1,3 +1,11 @@
+# Version 0.5.1 January 2026 FR review candidate
+
+Continues PR #11. Adds a source-specific layout/table renderer, protected manual-comparison gate, common facts and alternatives, a full student reader with server-timed sessions, private tags/highlights, actual personal dashboard activity and resumable owner bulk review. Real academic records remain Needs Review.
+
+**Academic acceptance is incomplete:** the RTP is available; January 2026 MTP I/II and examination/suggested-answer raw originals and owner decisions are still required. No other attempt is substituted. Public code/CI contains no copied PDF prose or private research files.
+
+[iPad install/review](docs/v051/IPAD-INSTALL-AND-REVIEW.md) · [feature/source coverage matrix](docs/v051/RELEASE-AND-FEATURE-MATRIX.md) · [migration/rollback](docs/v051/MIGRATION-AND-ROLLBACK.md).
+
 # Version 0.5 — Financial Reporting subjective review release candidate
 
 Continues PR #10 / V0.4.1. [iPad installation and review](docs/v05/IPAD-INSTALL-AND-REVIEW.md), [migration and architecture](docs/v05/MIGRATION-AND-ARCHITECTURE.md), and [actual coverage / unfinished work](docs/v05/COVERAGE-AND-UNFINISHED.md).

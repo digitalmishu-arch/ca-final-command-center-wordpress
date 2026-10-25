@@ -73,7 +73,7 @@ def all_lines(document):
                 lines.append(dict(page=p.number + 1, bbox=box, text=text, font=main['font'], size=main['size'],
                                   bold=bool(main['flags'] & 16 or re.search('bold|black', main['font'], re.I)),
                                   rgb=[(c >> 16) & 255, (c >> 8) & 255, c & 255], column=0,
-                                  spans=[dict(text=s['text'], bbox=list(s['bbox']), flags=s['flags']) for s in spans]))
+                                  spans=[dict(text=s['text'], bbox=list(s['bbox']), flags=s['flags'], font=s['font']) for s in spans]))
     return sorted(lines, key=lambda l: (l['page'], round(l['bbox'][1] / 3), l['bbox'][0]))
 
 
@@ -200,62 +200,15 @@ def fidelity(source_text, rendered_text):
 
 
 def rich(q, document):
-    rows = q['lines']; blocks = []; used = set(); warnings = []
-    for pn in sorted({l['page'] for l in rows}):
-        page = document[pn-1]; selected=[(i,l) for i,l in enumerate(rows) if l['page']==pn]
-        # Native vector/word table recognition; no invented cells or filled values.
-        cache_key=(document.name,pn)
-        try:
-            if cache_key not in _TABLE_CACHE:_TABLE_CACHE[cache_key]=[dict(bbox=list(t.bbox),cells=t.cells,rows=t.extract()) for t in page.find_tables().tables]
-            tables=_TABLE_CACHE[cache_key]
-        except Exception: tables=[]; warnings.append('table_detection_failed_page_'+str(pn))
-        for table in tables:
-            bbox=fitz.Rect(table['bbox']); inside=[(i,l) for i,l in selected if bbox.contains(fitz.Point((l['bbox'][0]+l['bbox'][2])/2,(l['bbox'][1]+l['bbox'][3])/2))]
-            if not inside: continue
-            if not all(any(abs(c[1]-l['bbox'][1])<25 for c in table['cells'] if c) for _,l in inside):
-                warnings.append('table_geometry_ambiguous_page_'+str(pn)); continue
-            cells=table['rows']
-            if len(cells)<2 or max(map(len,cells),default=0)<2: continue
-            source='\n'.join(l['text'] for _,l in inside)
-            check=fidelity(source,' '.join(str(c or '') for r in cells for c in r))
-            if not check['passed']:
-                warnings.append('table_numeric_fidelity_failed_page_'+str(pn));continue
-            # Duplicate text must not be removed without cell-level fidelity.
-            normal=lambda s:re.sub(r'\s+','',s)
-            if normal(source)!=normal(''.join(str(c or '') for r in cells for c in r)):
-                warnings.append('table_reading_order_requires_review_page_'+str(pn));continue
-            used.update(i for i,_ in inside)
-            blocks.append(dict(type='table',page=pn,bbox=list(bbox),rows=cells,merged_cells='not_inferred',requires_review=True))
-    for i,l in enumerate(rows):
-        if i in used: continue
-        spans=[]
-        for s in l.get('spans',[]):
-            text=html.escape(s['text'])
-            if s['flags']&1:text='<sup>'+text+'</sup>'
-            if s['flags']&2:text='<em>'+text+'</em>'
-            if s['flags']&16:text='<strong>'+text+'</strong>'
-            spans.append(text)
-        blocks.append(dict(type='paragraph',page=l['page'],bbox=l['bbox'],html=''.join(spans) or html.escape(l['text'])))
-    blocks.sort(key=lambda b:(b['page'],b['bbox'][1],b['bbox'][0]))
-    rendered=[]
-    for b in blocks:
-        if b['type']=='table':rendered.append('<table><tbody>'+''.join('<tr>'+''.join('<td>'+html.escape(str(c or '')).replace('\n','<br>')+'</td>' for c in r)+'</tr>' for r in b['rows'])+'</tbody></table>')
-        else:rendered.append('<p>'+b['html']+'</p>')
-    body='\n'.join(rendered); plain='\n'.join(l['text'] for l in rows)
-    check=fidelity(plain,re.sub('<[^>]*>',' ',body))
-    if not check['passed']:warnings.append('numeric_or_symbol_fidelity_failed')
-    # Text columns without an accepted table must be reviewed, not called exact.
-    if any(re.match(r'^[₹`(−–-]?\d[\d,.%() −–-]*$',l['text']) for l in rows) and not used:
-        warnings.append('possible_unrecovered_table_or_calculation_columns')
-    return dict(schema='cafcc-rich-v1',body_html=body,plain_text=plain,blocks=blocks,source_text_sha256=digest(plain.encode()),
-                fidelity=check,warnings=sorted(set(warnings)),transcription_status='needs_review')
+    from gold_layout import reconstruct
+    return reconstruct(q, document)
 
 
 def process(inventory, output, limit=None):
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     db=sqlite3.connect(output/'checkpoints.sqlite');db.execute('PRAGMA journal_mode=WAL')
     db.execute('CREATE TABLE IF NOT EXISTS documents (file_id TEXT, source_hash TEXT, engine_hash TEXT, status TEXT, payload TEXT, updated TEXT, PRIMARY KEY(file_id,source_hash,engine_hash))')
-    engine_hash=digest(Path(__file__).read_bytes()+Path(layout.__file__).read_bytes())
+    engine_hash=digest(Path(__file__).read_bytes()+Path(layout.__file__).read_bytes()+Path(__file__).with_name('gold_layout.py').read_bytes())
     done=0
     for source in inventory:
         sha=source['source_sha256'];key=(source['file_id'],sha,engine_hash)

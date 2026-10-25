@@ -5,7 +5,7 @@ final class CAFCC_Explorer {
     /** Applied to v1 reads/writes too: withdrawing new sources/batches cannot leak through old routes. */
     public static function visibility_guard() {
         $dm=CAFCC_DB::table('document_meta'); $qm=CAFCC_DB::table('question_meta');
-        return (class_exists('CAFCC_Studio')?CAFCC_Studio::question_guard():'')." AND NOT EXISTS (SELECT 1 FROM $dm vdm WHERE vdm.document_id=d.id AND NOT (".CAFCC_Academic::published('vdm')."))
+        return (class_exists('CAFCC_Studio')?CAFCC_Studio::question_guard():'').(class_exists('CAFCC_Review_Tools')?CAFCC_Review_Tools::guard():'')." AND NOT EXISTS (SELECT 1 FROM $dm vdm WHERE vdm.document_id=d.id AND NOT (".CAFCC_Academic::published('vdm')."))
             AND NOT EXISTS (SELECT 1 FROM $qm vqm WHERE vqm.question_id=q.id AND NOT (".CAFCC_Academic::active('vqm')."))";
     }
 
@@ -47,7 +47,7 @@ final class CAFCC_Explorer {
         $page=$request->get_param('page')??'1';
         if (!is_scalar($page) || !preg_match('/^[1-9][0-9]{0,4}$/D',(string)$page)) { return CAFCC_Repository::error('Invalid page.'); }
         $f['page']=(int)$page;
-        foreach (array('search','exam_attempt','source_type') as $key) {
+        foreach (array('search','exam_attempt','source_type','mtp_series') as $key) {
             $value=$request->get_param($key)??'';
             if (!is_string($value) || strlen($value)>120) { return CAFCC_Repository::error('Invalid filter text.'); }
             $f[$key]=sanitize_text_field($value);
@@ -138,10 +138,10 @@ final class CAFCC_Explorer {
             $like='%'.$wpdb->esc_like($f['search']).'%'; $where.=" AND (q.title LIKE %s OR q.question_number LIKE %s OR qm.stable_key LIKE %s OR EXISTS (SELECT 1 FROM $content pc WHERE pc.question_id=q.id AND pc.content_kind='question' AND ".CAFCC_Practice::permitted_sql('pc')." AND pc.search_text LIKE %s))"; array_push($args,$like,$like,$like,$like);
         }
         if(!empty($f['bookmarked'])){$notebook=CAFCC_Practice::table('notebook');$where.=" AND EXISTS (SELECT 1 FROM $notebook nb WHERE nb.question_id=q.id AND nb.user_id=%d AND nb.bookmarked=1)";$args[]=$user_id;}
-        if (!empty($f['source_type']) || !empty($f['exam_attempt'])) {
+        if (!empty($f['source_type']) || !empty($f['exam_attempt']) || !empty($f['mtp_series'])) {
             $occ=''; $old=''; $oa=array(); $la=array();
-            foreach (array('source_type','exam_attempt') as $key) {
-                if (!empty($f[$key])) { $occ.=" AND od.$key=%s"; $old.=" AND d.$key=%s"; $oa[]=$f[$key]; $la[]=$f[$key]; }
+            foreach (array('source_type','exam_attempt','mtp_series') as $key) {
+                if (!empty($f[$key])) { $occ.=" AND ".($key==='mtp_series'?'odm':'od').".$key=%s"; $old.=" AND ".($key==='mtp_series'?"''":"d.$key")."=%s"; $oa[]=$f[$key]; $la[]=$f[$key]; }
             }
             $where.=" AND ((qm.id IS NULL $old) OR EXISTS (SELECT 1 FROM $oc o JOIN $docs od ON od.id=o.document_id JOIN $dm odm ON odm.document_id=od.id WHERE o.question_id=q.id AND ".self::occurrence_where()." $occ))";
             array_push($args,...$la,...$oa);

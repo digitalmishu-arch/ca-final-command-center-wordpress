@@ -16,7 +16,7 @@ final class CAFCC_Release_V5 {
         return true;
     }
     public static function format($data){if(($data['question_type']??'')==='mcq'||preg_match('/\bmcq\b|multiple.choice|objective/i',$data['section']??''))return 'mcq';$value=strtolower($data['question_format']??'');if(in_array($value,array('subjective','mcq','mixed'),true))return $value;$section=$data['section']??'';if(($data['question_type']??'')==='mcq'||preg_match('/\bmcq\b|multiple.choice|objective/i',$section))return 'mcq';return preg_match('/descriptive|subjective/i',$section)||in_array($data['question_type']??'',array('theory','practical'),true)?'subjective':'mixed';}
-    public static function guard($alias){return " AND $alias.question_format='subjective'".CAFCC_Rights::public_guard($alias);}
+    public static function guard($alias){return " AND $alias.question_format='subjective' AND ($alias.pilot_gate=0 OR $alias.manual_quality_pass=1)".CAFCC_Rights::public_guard($alias);}
     public static function clean_content($value,$rights_mode,$basis){
         if(!is_array($value)||array_diff(array_keys($value),array('question','answer')))return CAFCC_Repository::error('Use question and answer rich-content fields.');
         if($value&&(!in_array($rights_mode,array('original','licensed_private_review','licensed_public'),true)||!$basis))return CAFCC_Repository::error('Full private content requires an explicit authorised storage basis.');
@@ -35,7 +35,7 @@ final class CAFCC_Release_V5 {
         if(!empty($d['blocking_exceptions']))$errors[]='Resolve these blocking exceptions and save corrections: '.implode('; ',$d['blocking_exceptions']);
         foreach(array('question','answer') as $kind){if(empty($d['rich_content'][$kind]['body_html'])||!trim(wp_strip_all_tags($d['rich_content'][$kind]['body_html']??'')))$errors[]='Attach the complete authorised '.$kind.' content; a reference or page candidate is insufficient for full-text publication.';if(empty($d['rich_content'][$kind]['author_name']))$errors[]='Record the '.$kind.' author/source attribution.';}
         if($d['rights_mode']==='original'){$grant=null;}else{$grant=CAFCC_Rights::resolve($d);if(!$grant)$errors[]='Select one active source-wide permission covering the question, suggested answer, electronic storage, intended periods and commercial publication.';}
-        return array_values(array_unique($errors));
+        $errors=array_merge($errors,CAFCC_Review_Tools::blockers($r));return array_values(array_unique($errors));
     }
     public static function decision($id,$input){
         if(is_wp_error($e=CAFCC_Studio::admin()))return $e;
@@ -49,7 +49,7 @@ final class CAFCC_Release_V5 {
             // fingerprints are still retained; no earlier AI/test approval is used.
             $r['data']=$d;CAFCC_Studio::$writing=true;
             try{
-                $mapped=CAFCC_Studio::materialize($r,true);if(is_wp_error($mapped))return $mapped;$r=array_merge($r,$mapped);
+                $mapped=CAFCC_Studio::materialize($r,true);if(is_wp_error($mapped))return $mapped;$r=array_merge($r,$mapped);$linked=CAFCC_Review_Tools::link($r);if(is_wp_error($linked))return $linked;
                 foreach(array('question','answer') as $kind){$body=$d['rich_content'][$kind];$ct=CAFCC_Practice::table('content');$old=$wpdb->get_row($wpdb->prepare("SELECT * FROM $ct WHERE question_id=%d AND content_kind=%s FOR UPDATE",$r['question_id'],$kind),ARRAY_A);
                     $v=array('question_id'=>$r['question_id'],'content_kind'=>$kind,'body_html'=>$body['body_html'],'author_name'=>$body['author_name'],'source_location'=>$body['source_location'],'rights_type'=>$grant?'licensed':'original','rights_basis'=>$d['rights_basis'],'rights_expires'=>$grant?$grant['expires_on']:'');
                     if($old)$v['expected_revision']=$old['revision'];$pc=CAFCC_Practice::save($v,$old?(int)$old['id']:0);if(is_wp_error($pc))return $pc;$approved=CAFCC_Practice::approve((int)$pc['id'],array('expected_revision'=>$pc['revision'],'rights_confirmed'=>true));if(is_wp_error($approved))return $approved;
