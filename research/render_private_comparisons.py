@@ -25,7 +25,7 @@ def render(root):
             for file in sorted((root/'table-comparisons').glob('*.html')):
                 page.goto('http://127.0.0.1:'+str(server.server_port)+'/table-comparisons/'+file.name,wait_until='networkidle')
                 page.evaluate('document.fonts.ready');page.wait_for_timeout(120)
-                page.screenshot(path=str(output/(file.stem+'.png')),full_page=True)
+                page.screenshot(path=str(output/(file.stem+'.png')),full_page=True,animations='disabled')
             browser.close()
     finally:server.shutdown();server.server_close()
     print('Private comparison screenshots:',len(list(output.glob('*.png'))))

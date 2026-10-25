@@ -27,3 +27,4 @@ if [[ "${CAFCC_TEST_WEBKIT:-0}" == 1 ]]; then CAFCC_BROWSER_ENGINE=webkit python
 python3 tests/browser-v05.py
 
 python3 tests/browser-v051.py
+if [[ "${CAFCC_TEST_WEBKIT:-0}" == 1 ]]; then CAFCC_BROWSER_ENGINE=webkit python3 tests/browser-v051.py; fi
