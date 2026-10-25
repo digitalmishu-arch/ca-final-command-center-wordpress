@@ -14,9 +14,9 @@
         if (!response.ok) throw new Error(data.message || 'The request failed. Reload and try again.');
         return data;
     }
-    function link(url, label) {
+    function link(url, label, verifiedMirror = false) {
         const u = new URL(url);
-        if (u.protocol !== 'https:' || !/(^|\.)(icai\.org|icai\.nic\.in)$/.test(u.hostname)) return node('span', 'Official source unavailable');
+        if (u.protocol !== 'https:' || (!/(^|\.)(icai\.org|icai\.nic\.in)$/.test(u.hostname) && !verifiedMirror) || /(^|\.)(drive|docs)\.google\.com$/.test(u.hostname)) return node('span', 'Official source unavailable');
         const a = node('a', label, 'cc-source-link'); a.href = u.href; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a;
     }
     document.querySelectorAll('[data-cafcc-explorer]').forEach(root => {
@@ -56,7 +56,7 @@
                 card.dataset.subject = q.subject_code;
                 card.dataset.questionId = q.id;
                 const head = node('div', undefined, 'cc-card-top'); head.append(node('span', q.subject_code, 'cc-subject cc-subject-' + q.subject_code.toLowerCase()), node('span', q.stable_key, 'cc-stable-id'));
-                const citations=node('div',undefined,'cc-source-citations');(q.source_citations||[]).forEach(c=>{const location=c.page?.match(/\d+/)?.[0],target=new URL(c.url);if(location)target.hash='page='+location;const a=link(target.href,c.authored?'Independently authored example · official syllabus background':c.label);a.classList.add('cc-official-citation');citations.append(a);});card.append(citations);
+                const citations=node('div',undefined,'cc-source-citations');(q.source_citations||[]).forEach(c=>{const location=c.page?.match(/\d+/)?.[0],target=new URL(c.url);if(location)target.hash='page='+location;const a=link(target.href,c.authored?'Independently authored example · official syllabus background':c.label+(c.hosting_label==='Owner-verified ICAI mirror'?' · Verified mirror':''),c.hosting_label==='Owner-verified ICAI mirror');a.title=c.hosting_label||'Verified source PDF';a.classList.add('cc-official-citation');citations.append(a);});card.append(citations);
                 card.append(head, node('h4', q.title), node('p', q.chapter_title + ' · ' + q.syllabus_version, 'cc-meta'));
                 const tags = node('div', undefined, 'cc-tags');
                 q.classifications.forEach(t => tags.append(node('span', t.title + (t.heading_origin === 'editorial' ? ' · Editorial' : ' · ICAI'), 'cc-tag')));
@@ -82,7 +82,7 @@
                     const source = node('div', undefined, 'cc-occurrence');
                     source.append(node('span', sourceLabels[o.source_type] || o.source_type, 'cc-source-type'), node('strong', o.title));
                     const details = [o.exam_attempt,o.document_section ? 'Section ' + o.document_section : '', o.issue_period, o.mtp_series ? 'Series ' + o.mtp_series : '', o.page_reference ? 'Page ' + o.page_reference : '', 'Q ' + o.question_number + (o.subquestion_number ? ' (' + o.subquestion_number + ')' : ''), o.marks !== null ? o.marks + ' verified marks' : ''].filter(Boolean);
-                    source.append(node('p', details.join(' · '), 'cc-meta'), link(o.official_url, o.source_type==='other'&&q.practice_content?.rights_label==='Independently authored'?'Official ICAI background resource':'Open Official Question Source')); sources.append(source);
+                    source.append(node('p', details.join(' · '), 'cc-meta'), link(o.official_url, o.source_type==='other'&&q.practice_content?.rights_label==='Independently authored'?'Official ICAI background resource':(q.source_citations?.find(c=>c.occurrence_id===Number(o.id))?.hosting_label==='Owner-verified ICAI mirror'?'Open Verified Mirror PDF':'Open Official Question Source'),q.source_citations?.find(c=>c.occurrence_id===Number(o.id))?.hosting_label==='Owner-verified ICAI mirror')); sources.append(source);
                 });
                 card.append(sources);
                 const actions = node('div', undefined, 'cc-card-actions'), answerButton = node('button', 'Show Answer', 'cc-secondary'), panel = node('div', undefined, 'cc-answer-panel');
@@ -97,7 +97,7 @@
                         const result = await api('answers/' + q.id + (q.occurrence_id ? '?occurrence_id=' + q.occurrence_id : ''));if(answerToken!==answerGeneration)return; panel.replaceChildren();
                         if (!result.items.length) panel.append(node('p', result.empty_message));
                         result.items.forEach(a => {
-                            if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.attribution?' · '+a.attribution:'') + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body);if(a.official_url)panel.append(link(a.official_url,'Official answer source · '+(a.verified_page||a.source_location))); }
+                            if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.attribution?' · '+a.attribution:'') + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body);if(a.official_url)panel.append(link(a.official_url,(a.hosting_label==='Owner-verified ICAI mirror'?'Verified mirror answer source':'Official answer source')+' · '+(a.verified_page||a.source_location),a.hosting_label==='Owner-verified ICAI mirror')); }
                             else if (a.mode === 'official_link') panel.append(node('p', 'Official answer · ' + a.source_location), link(a.official_url, 'View Official Answer'));
                             else panel.append(node('strong', a.rights_label), node('p', a.answer_text, 'cc-solution-text'));
                         });

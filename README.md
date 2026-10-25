@@ -1,3 +1,9 @@
+# Version 0.5.2 — January 2026 corrective software
+
+Continues PR #12. Adds scan-free, administrator-attested physical ICAI permissions, an exact private source register with labelled mirror citations, one ZIP academic import with checksum/dependency preview and resumable checkpoints, and one-confirmation owner publication. [Install, import, review, source coverage and rollback instructions](docs/v051/CORRECTIVE-0.5.2.md).
+
+**Academic completion remains open:** one January RTP PDF has been read; six owner-verified MTP/exam PDFs failed retrieval under this environment’s network policy. Their source selections are accepted; no substitute documents, invented counts, academic approvals or publications are supplied. Private datasets are delivered separately, never in GitHub/Actions or Media. The newer corrective guide takes precedence over the historical release notes below.
+
 # Version 0.5.1 January 2026 FR review candidate
 
 Continues PR #11. Adds a source-specific layout/table renderer, protected manual-comparison gate, common facts and alternatives, a full student reader with server-timed sessions, private tags/highlights, actual personal dashboard activity and resumable owner bulk review. Real academic records remain Needs Review.

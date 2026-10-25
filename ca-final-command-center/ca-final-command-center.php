@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CA Final Command Center
  * Description: Academic question references and private student progress for CA Final.
- * Version: 0.5.1
+ * Version: 0.5.2
  * Requires at least: 6.6
  * Requires PHP: 8.1
  * Author: CA Final Command Center
@@ -11,9 +11,9 @@
  */
 
 defined('ABSPATH') || exit;
-define('CAFCC_VERSION', '0.5.1');
+define('CAFCC_VERSION', '0.5.2');
 define('CAFCC_FILE', __FILE__);
-foreach (array('db', 'repository', 'academic-db', 'academic', 'import', 'explorer', 'rest', 'admin', 'frontend', 'academic-ui','practice','practice-ui','bank-db','facets','studio','review-xlsx','access','portal','resources','topic-proposals','diagnostics','rights','release-v5','corpus-import','review-v5-xlsx','study','review-tools') as $cafcc_component) {
+foreach (array('db', 'repository', 'academic-db', 'academic', 'import', 'explorer', 'rest', 'admin', 'frontend', 'academic-ui','practice','practice-ui','bank-db','facets','studio','review-xlsx','access','portal','resources','topic-proposals','diagnostics','rights','release-v5','corpus-import','review-v5-xlsx','study','review-tools','sources','package') as $cafcc_component) {
     require_once __DIR__ . '/includes/class-cafcc-' . $cafcc_component . '.php';
 }
 register_activation_hook(__FILE__, array('CAFCC_DB', 'activate'));
@@ -40,5 +40,7 @@ add_action('plugins_loaded', function () {
     CAFCC_Review_V5_XLSX::init();
     CAFCC_Study::init();
     CAFCC_Review_Tools::init();
+    CAFCC_Sources::init();
+    CAFCC_Package::init();
 });
 // Intentionally no destructive deactivation or uninstall hook.

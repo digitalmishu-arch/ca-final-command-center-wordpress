@@ -98,7 +98,7 @@ final class CAFCC_Repository {
                 }
                 $value = trim($value);
                 if ('url' === $type) {
-                    $value = self::official_url($value);
+                    $value = 'documents' === $entity && class_exists('CAFCC_Sources') ? CAFCC_Sources::authorised_url($value) : self::official_url($value);
                 } elseif (is_int($type)) {
                     $value = sanitize_text_field($value);
                     if ('' === $value || strlen($value) > $type) {
