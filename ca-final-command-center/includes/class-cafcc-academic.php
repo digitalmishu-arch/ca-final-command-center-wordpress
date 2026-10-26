@@ -125,7 +125,7 @@ final class CAFCC_Academic {
             } else {
                 if (!is_string($value)) { return CAFCC_Repository::error($key.' must be text.'); }
                 $value = trim($value);
-                if ('url' === $type) { $value = CAFCC_Repository::official_url($value); }
+                if ('url' === $type) { $value = in_array($kind,array('documents','answers'),true)?CAFCC_Sources::authorised_url($value):CAFCC_Repository::official_url($value); }
                 else { $value = 'answer' === $type ? sanitize_textarea_field($value) : sanitize_text_field($value); }
                 if (is_wp_error($value)) { return $value; }
                 $limit = array('text'=>190,'long'=>500,'rights'=>1000,'answer'=>30000,'key'=>120,'month'=>7,'url'=>2048,'context'=>2000,'sha256'=>64)[$type] ?? 190;

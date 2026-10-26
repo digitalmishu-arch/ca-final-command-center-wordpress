@@ -14,9 +14,9 @@
         if (!response.ok) throw new Error(data.message || 'The request failed. Reload and try again.');
         return data;
     }
-    function link(url, label) {
+    function link(url, label, verifiedMirror = false) {
         const u = new URL(url);
-        if (u.protocol !== 'https:' || !/(^|\.)(icai\.org|icai\.nic\.in)$/.test(u.hostname)) return node('span', 'Official source unavailable');
+        if (u.protocol !== 'https:' || (!/(^|\.)(icai\.org|icai\.nic\.in)$/.test(u.hostname) && !verifiedMirror) || /(^|\.)(drive|docs)\.google\.com$/.test(u.hostname)) return node('span', 'Official source unavailable');
         const a = node('a', label, 'cc-source-link'); a.href = u.href; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a;
     }
     document.querySelectorAll('[data-cafcc-explorer]').forEach(root => {
@@ -26,12 +26,13 @@
         jump.addEventListener('click', () => root.querySelector('.cc-filters').scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'})); root.append(jump);
         if ('IntersectionObserver' in window) { const observer = new IntersectionObserver(entries => { jump.hidden = entries[0].isIntersecting; }); observer.observe(root.querySelector('.cc-filters')); }
         const feedback = root.querySelector('.cc-feedback'), list = root.querySelector('.cc-question-list'), summary = root.querySelector('.cc-summary'), pager = root.querySelector('.cc-pagination');
-        let page = 1, generation = 0, scope = 'browse';
+        const savedParams=new URLSearchParams(location.search);for(const [key,f] of Object.entries(fields)){const value=savedParams.get(key);if(value===null)continue;if(f.type==='checkbox')f.checked=value==='1';else{if(f.tagName==='SELECT'&&![...f.options].some(o=>o.value===value))f.append(option(value,'Restoring selection…'));f.value=value;}}
+        let page = Math.max(1,Number(savedParams.get('page'))||1), generation = 0, scope = savedParams.get('scope')==='practice'?'practice':'browse';
         const tell = (message, error = false) => { feedback.textContent = message; feedback.classList.toggle('cc-error', error); };
         function params() {
             const p = new URLSearchParams({page: String(page),scope});
             Object.entries(fields).forEach(([key, field]) => { if (field.type === 'checkbox') { if (field.checked) p.set(key, '1'); } else if (field.value.trim()) p.set(key, field.value.trim()); });
-            if(root.dataset.view==='practice')p.set('personal',fields.personal?.value||'all');return p.toString();
+            if(root.dataset.view==='practice')p.set('personal',fields.personal?.value||'all');const address=new URL(location.href);for(const key of ['page','scope',...Object.keys(fields)])address.searchParams.delete(key);p.forEach((v,k)=>{if(k!=='private_tag')address.searchParams.set(k,v);});history.replaceState(null,'',address);return p.toString();
         }
         function fill(key, rows, first, text) {
             const select = fields[key], selected = select.value;
@@ -55,7 +56,7 @@
                 card.dataset.subject = q.subject_code;
                 card.dataset.questionId = q.id;
                 const head = node('div', undefined, 'cc-card-top'); head.append(node('span', q.subject_code, 'cc-subject cc-subject-' + q.subject_code.toLowerCase()), node('span', q.stable_key, 'cc-stable-id'));
-                const citations=node('div',undefined,'cc-source-citations');(q.source_citations||[]).forEach(c=>{const a=link(c.url,c.authored?'Independently authored example · official syllabus background':c.label);a.classList.add('cc-official-citation');citations.append(a);});card.append(citations);
+                const citations=node('div',undefined,'cc-source-citations');(q.source_citations||[]).forEach(c=>{const location=c.page?.match(/\d+/)?.[0],target=new URL(c.url);if(location)target.hash='page='+location;const a=link(target.href,c.authored?'Independently authored example · official syllabus background':c.label+(c.hosting_label==='Owner-verified ICAI mirror'?' · Verified mirror':''),c.hosting_label==='Owner-verified ICAI mirror');a.title=c.hosting_label||'Verified source PDF';a.classList.add('cc-official-citation');citations.append(a);});card.append(citations);
                 card.append(head, node('h4', q.title), node('p', q.chapter_title + ' · ' + q.syllabus_version, 'cc-meta'));
                 const tags = node('div', undefined, 'cc-tags');
                 q.classifications.forEach(t => tags.append(node('span', t.title + (t.heading_origin === 'editorial' ? ' · Editorial' : ' · ICAI'), 'cc-tag')));
@@ -81,26 +82,27 @@
                     const source = node('div', undefined, 'cc-occurrence');
                     source.append(node('span', sourceLabels[o.source_type] || o.source_type, 'cc-source-type'), node('strong', o.title));
                     const details = [o.exam_attempt,o.document_section ? 'Section ' + o.document_section : '', o.issue_period, o.mtp_series ? 'Series ' + o.mtp_series : '', o.page_reference ? 'Page ' + o.page_reference : '', 'Q ' + o.question_number + (o.subquestion_number ? ' (' + o.subquestion_number + ')' : ''), o.marks !== null ? o.marks + ' verified marks' : ''].filter(Boolean);
-                    source.append(node('p', details.join(' · '), 'cc-meta'), link(o.official_url, o.source_type==='other'&&q.practice_content?.rights_label==='Independently authored'?'Official ICAI background resource':'Open Official Question Source')); sources.append(source);
+                    source.append(node('p', details.join(' · '), 'cc-meta'), link(o.official_url, o.source_type==='other'&&q.practice_content?.rights_label==='Independently authored'?'Official ICAI background resource':(q.source_citations?.find(c=>c.occurrence_id===Number(o.id))?.hosting_label==='Owner-verified ICAI mirror'?'Open Verified Mirror PDF':'Open Official Question Source'),q.source_citations?.find(c=>c.occurrence_id===Number(o.id))?.hosting_label==='Owner-verified ICAI mirror')); sources.append(source);
                 });
                 card.append(sources);
                 const actions = node('div', undefined, 'cc-card-actions'), answerButton = node('button', 'Show Answer', 'cc-secondary'), panel = node('div', undefined, 'cc-answer-panel');
                 answerButton.type = 'button'; panel.id = 'cc-answer-' + q.id + '-' + Math.random().toString(16).slice(2); panel.hidden = true; answerButton.setAttribute('aria-controls', panel.id); answerButton.setAttribute('aria-expanded', 'false');
                 panel.setAttribute('aria-live', 'polite');
+                let answerGeneration=0;const closeAnswer=()=>{answerGeneration++;panel.hidden=true;panel.replaceChildren();answerButton.textContent='Show Answer';answerButton.setAttribute('aria-expanded','false');answerButton.disabled=false;panel.removeAttribute('aria-busy');};card.addEventListener('cafcc:hideanswer',closeAnswer);
                 answerButton.addEventListener('click', async () => {
-                    if (!panel.hidden) { panel.hidden = true; panel.replaceChildren(); answerButton.textContent = 'Show Answer'; answerButton.setAttribute('aria-expanded', 'false'); return; }
+                    if (!panel.hidden) { closeAnswer(); return; }const answerToken=++answerGeneration;
                     panel.hidden = false; answerButton.textContent = 'Hide Answer'; answerButton.setAttribute('aria-expanded', 'true'); panel.setAttribute('aria-busy', 'true');
                     panel.replaceChildren(node('p', 'Loading reviewed answer references…')); answerButton.disabled = true;
                     try {
-                        const result = await api('answers/' + q.id + (q.occurrence_id ? '?occurrence_id=' + q.occurrence_id : '')); panel.replaceChildren();
+                        const result = await api('answers/' + q.id + (q.occurrence_id ? '?occurrence_id=' + q.occurrence_id : ''));if(answerToken!==answerGeneration)return; panel.replaceChildren();
                         if (!result.items.length) panel.append(node('p', result.empty_message));
                         result.items.forEach(a => {
-                            if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.attribution?' · '+a.attribution:'') + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body); }
+                            if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.attribution?' · '+a.attribution:'') + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body);if(a.official_url)panel.append(link(a.official_url,(a.hosting_label==='Owner-verified ICAI mirror'?'Verified mirror answer source':'Official answer source')+' · '+(a.verified_page||a.source_location),a.hosting_label==='Owner-verified ICAI mirror')); }
                             else if (a.mode === 'official_link') panel.append(node('p', 'Official answer · ' + a.source_location), link(a.official_url, 'View Official Answer'));
                             else panel.append(node('strong', a.rights_label), node('p', a.answer_text, 'cc-solution-text'));
                         });
-                    } catch (e) { panel.replaceChildren(node('p', e.message, 'cc-error')); }
-                    finally { answerButton.disabled = false; panel.removeAttribute('aria-busy'); }
+                    } catch (e) {if(answerToken===answerGeneration)panel.replaceChildren(node('p', e.message, 'cc-error')); }
+                    finally { if(answerToken===answerGeneration){answerButton.disabled = false; panel.removeAttribute('aria-busy');} }
                 });
                 const progressLabel = node('label', 'Practice status'), select = node('select'); Object.entries(statuses).forEach(([key, text]) => select.append(option(key, text))); select.value = q.progress_status;
                 let saved = q.progress_status;
@@ -114,7 +116,7 @@
                 bookmark.addEventListener('click', async () => { bookmark.disabled = true; try { const saved = await api('notebook/' + q.id, {bookmarked: bookmark.getAttribute('aria-pressed') !== 'true'}, false, true); bookmark.setAttribute('aria-pressed', String(saved.bookmarked)); bookmark.textContent = saved.bookmarked ? '★ Bookmarked' : '☆ Bookmark'; tell('Your bookmark is saved.'); } catch (e) { tell(e.message, true); } finally { bookmark.disabled = false; } });
                 const notes = node('details', undefined, 'cc-private-notes'), noteLabel = node('label', 'Your private note'), noteText = node('textarea'), saveNote = node('button', 'Save my note', 'cc-secondary'); noteText.value = q.notebook.note_text; noteText.maxLength = 10000; noteText.rows = 4; saveNote.type = 'button'; noteLabel.append(noteText); notes.append(node('summary', 'My private notes'), noteLabel, saveNote);
                 saveNote.addEventListener('click', async () => { saveNote.disabled = true; try { await api('notebook/' + q.id, {note_text: noteText.value}, false, true); tell('Your private note is saved.'); } catch (e) { tell(e.message, true); } finally { saveNote.disabled = false; } });
-                progressLabel.append(select); const buttons = node('div', undefined, 'cc-action-buttons'); buttons.append(answerButton, bookmark); actions.append(buttons, progressLabel); card.append(actions, panel, notes); list.append(card);
+                progressLabel.append(select); const buttons = node('div', undefined, 'cc-action-buttons'); buttons.append(answerButton, bookmark); actions.append(buttons, progressLabel); card.append(actions, panel, notes); list.append(card);document.dispatchEvent(new CustomEvent('cafcc:card',{detail:{card,q}}));
             });
             const max = Math.max(1, Math.ceil(data.total / data.per_page)), prev = node('button', 'Previous', 'cc-secondary'), next = node('button', 'Next', 'cc-secondary');
             prev.type = next.type = 'button'; prev.disabled = page <= 1; next.disabled = page >= max;
@@ -180,11 +182,14 @@
         input.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); results.querySelector('button')?.focus(); } if (e.key === 'Escape') { results.replaceChildren(); input.setAttribute('aria-expanded','false'); } });
         results.addEventListener('keydown', e => { const buttons=[...results.querySelectorAll('button')], i=buttons.indexOf(document.activeElement); if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();buttons[(i+(e.key==='ArrowDown'?1:buttons.length-1))%buttons.length]?.focus();}if(e.key==='Escape'){results.replaceChildren();input.focus();input.setAttribute('aria-expanded','false');} });
         root.querySelectorAll('[data-facet-search]').forEach(search => { let timer; search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => refresh(),300); }); });
-        ['exam_attempt', 'source_type','practice_status',...(fields.personal?['personal']:[])].forEach(key => fields[key].addEventListener('change', () => { page = 1; refresh(); }));
+        ['exam_attempt', 'source_type','mtp_series','practice_status',...(fields.personal?['personal']:[])].forEach(key => fields[key].addEventListener('change', () => { if(key==='mtp_series'&&fields.mtp_series.value)fields.source_type.value='mtp';if(key==='source_type'&&fields.source_type.value&&fields.source_type.value!=='mtp')fields.mtp_series.value='';page = 1; refresh(); }));
+        if(fields.private_tag)fields.private_tag.addEventListener('change',()=>{page=1;refresh(false);});
         fields.bookmarked.addEventListener('change', () => { page = 1; refresh(false); });
         root.querySelector('.cc-search').addEventListener('submit', e => { e.preventDefault(); page = 1; refresh(false); });
         root.querySelector('.cc-reset').addEventListener('click', () => { Object.values(fields).forEach(f => { if (f.type === 'checkbox') f.checked = false; else f.value = f===fields.personal?'all':''; }); root.querySelectorAll('[data-facet-search],.cc-concept-input').forEach(f => { f.value=''; }); results.replaceChildren(); root.querySelector('.cc-selected-path').textContent=''; page = 1; refresh(); });
         root.querySelectorAll('[data-scope]').forEach(b=>b.addEventListener('click',()=>{scope=b.dataset.scope;root.querySelectorAll('[data-scope]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));results.replaceChildren();input.setAttribute('aria-expanded','false');page=1;refresh();}));
+        root.querySelectorAll('[data-scope]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.scope===scope)));
+        document.addEventListener('cafcc:activity',()=>{if(root.isConnected)api('summary?'+params()).then(drawSummary).catch(()=>{});});
         refresh();
     });
 })();
