@@ -41,3 +41,7 @@ WordPress 0.5.2 files and schema 7 are unchanged. Install 0.5.2 before importing
 The workbook keeps the original 26 portable identity columns and appends answer URL, alternative and parent/common-context metadata. Stable IDs, revision, source hash and exact HTML hashes remain protected by server validation. Full common context is included for review. Existing corrections require a fresh WordPress export; an Excel selection alone never publishes.
 
 Use the [0.5.2 iPad and rollback guide](CORRECTIVE-0.5.2.md). Only a matched database/files backup is a supported rollback. Physical iPad Safari and actual staging acceptance remain the owner's next checks; disposable approvals are explicitly software fixtures.
+
+## 0.5.3 reader patch
+
+Actual private source-derived browser acceptance exposed a whitespace mismatch: `Selection.toString()` collapses repeated spaces while the server validates exact stored HTML text. Highlights now use `Range.toString()` and unresolved DOM matches are skipped. An independently authored browser regression includes repeated spaces; no ICAI prose enters CI. The plugin version is 0.5.3 for asset cache refresh, database schema remains 7, and the same 0.5.2 academic ZIP format is supported.
