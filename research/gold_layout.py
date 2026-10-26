@@ -10,7 +10,7 @@ import html
 import re
 import fitz
 
-VERSION = 'gold-layout-1'
+VERSION = 'gold-layout-2'
 
 
 def sha(value):
@@ -42,7 +42,9 @@ def word_groups(page,box):
 
 def cell_text(page, box):
     text='\n'.join(t for _,t in word_groups(page,box))
-    if any(span.get('font')=='Rupee' and '`' in span['text'] for block in page.get_text('dict',clip=fitz.Rect(box))['blocks'] for line in block.get('lines',[]) for span in line['spans']):text=text.replace('`','₹')
+    # Clipping by a cell can discard the taller currency glyph even when the
+    # word's centre belongs in that cell. Inspect intersecting original spans.
+    if any(span.get('font')=='Rupee' and '`' in span['text'] and fitz.Rect(span['bbox']).intersects(fitz.Rect(box)) for block in page.get_text('dict')['blocks'] for line in block.get('lines',[]) for span in line['spans']):text=text.replace('`','₹')
     return text
 
 
@@ -100,8 +102,8 @@ def expand_financial_rows(page,model):
         cells=[c for c in model['cells'] if c['row']==physical];bands={}
         for c in cells:
             bands[c['column']]=word_groups(page,c['bbox'])
-        amounts=[y for c in cells if c['column']>0 for y,t in bands[c['column']] if re.fullmatch(AMOUNT,t)]
-        section_rows=[y for c in cells if c['column']==0 for y,t in bands[c['column']] if re.fullmatch(r'(?:Assets|Liabilities|Equity(?: and Liabilities)?|Non.current (?:assets|liabilities)|Current (?:assets|liabilities)|Shareholders?[’\']? equity|Financial (?:assets|liabilities)|Cash flows from[^:]*|Adjustments for[^:]*):?',t,re.I)]
+        amounts=[y for c in cells if c['column']>0 for y,t in bands[c['column']] if re.fullmatch(AMOUNT+r'(?:\s*(?:lakhs?|crores?|millions?|billions?|thousands?|units?|kg|MT))?',t,re.I)]
+        section_rows=[y for c in cells if c['column']==0 for y,t in bands[c['column']] if re.fullmatch(r'(?:Assets|Liabilities|Equity(?: and Liabilities)?|Other equity|Reserves and surplus|Non.current (?:assets|liabilities)|Current (?:assets|liabilities)|Shareholders?[’\']? equity|Financial (?:assets|liabilities)|Cash flows from[^:]*|Adjustments for[^:]*):?',re.sub(r'^[\s•▪\-–]+','',t),re.I)]
         anchors=[]
         for y in sorted(amounts+section_rows):
             if not anchors or y-anchors[-1]>5:anchors.append(y)
@@ -217,6 +219,15 @@ def reconstruct(q,document):
         else:
             paragraph=dict(type='heading' if heading else 'paragraph',page=l['page'],bbox=list(bbox),html=value);blocks.append(paragraph)
     blocks.sort(key=lambda b:(b['page'],b['bbox'][1],b['bbox'][0]))
+    currency_placeholder=any(s.get('font')=='Rupee' and '`' in s.get('text','') for l in lines for s in l.get('spans',[]))
+    if currency_placeholder:
+        # ICAI's mixed-font tables also use the same currency placeholder in
+        # substituted fonts. Preserve the original cell value as evidence.
+        for block in blocks:
+            if block['type']=='table':
+                for cell in block['cells']:
+                    if '`' in cell['text']:cell['original_text']=cell['text'];cell['text']=cell['text'].replace('`','₹');cell['symbol_normalization']='ICAI currency placeholder backtick to ₹; original cell retained'
+            elif '`' in block['html']:block['html']=block['html'].replace('`','₹')
     body='\n'.join(table_html(b) if b['type']=='table' else '<'+('h4' if b['type']=='heading' else 'p')+'>'+b['html']+'</'+('h4' if b['type']=='heading' else 'p')+'>' for b in blocks)
     raw_plain='\n'.join(l['text'] for l in lines);normalizations=['Rupee font backtick rendered as ₹'] if any(s.get('font')=='Rupee' for l in lines for s in l.get('spans',[])) else [];plain=raw_plain.replace('`','₹') if normalizations else raw_plain;rendered=html.unescape(re.sub('<[^>]*>',' ',body));before,after=numeric(plain),numeric(rendered)
     fidelity=dict(passed=before==after,missing=dict(before-after),added=dict(after-before),numeric_tokens_source=sum(before.values()))
@@ -229,24 +240,31 @@ def reconstruct(q,document):
 def discover(document,metadata):
     import fr_corpus as old
     lines=old.all_lines(document);lefts=Counter(round(l['bbox'][0]) for l in lines if re.match(r'^\d{1,2}\.(?:\s|$)',l['text']));margin=lefts.most_common(1)[0][0] if lefts else 72
-    book_style=any(re.fullmatch(r'Question\s+\d+',l['text'],re.I) for l in lines) and any(re.fullmatch(r'Answer',l['text'],re.I) for l in lines)
+    book_style=any(re.fullmatch(r'Questions?\s+\d+',l['text'],re.I) for l in lines) and any(re.fullmatch(r'Answer',l['text'],re.I) for l in lines)
+    # A sentence describing Part II in the instructions is not a section start.
+    part_heading=re.compile(r'^(?:(?:ANSWERS?)(?:\s+TO|\s+OF)?\s+)?PART\s*[-–—]?\s*(II|I)\b(?=\s*(?:$|[-–—:]|Case\b|Multiple\b|Descriptive\b|Subjective\b))',re.I)
+    explicit_parts=any(part_heading.match(l['text']) for l in lines)
+    section_started=not (metadata['source_type']=='mtp' and explicit_parts)
     section=[];headings=[];starts=[];answer_at=None;side='answer' if metadata.get('role')=='answers' else 'question';mcq=True if metadata['source_type']=='rtp' else False;question_formats={};current_number=None
     for i,l in enumerate(lines):
         t=l['text']
         if re.match(r'^(?:SUGGESTED ANSWERS|ANSWERS|Answers of Part)',t,re.I):
             if not answer_at:answer_at=dict(index=i,page=l['page'],bbox=l['bbox'])
             side='answer';section.append(dict(kind='answers',index=i,page=l['page'],bbox=l['bbox']))
-        if re.search(r'(?:PART\s*[-–]?\s*II|DESCRIPTIVE|SUBJECTIVE)',t,re.I):mcq=False;section.append(dict(kind='subjective',index=i,page=l['page'],bbox=l['bbox']))
-        if re.search(r'Multiple Choice|\bMCQ\b',t,re.I):mcq=True;section.append(dict(kind='mcq',index=i,page=l['page'],bbox=l['bbox']))
+        part=part_heading.match(t)
+        if part:
+            mcq=part[1].upper()=='I';section_started=True;section.append(dict(kind='mcq' if mcq else 'subjective',index=i,page=l['page'],bbox=l['bbox']))
+        elif not explicit_parts and re.match(r'^(?:DESCRIPTIVE|SUBJECTIVE)',t,re.I):mcq=False
         # Scope a preceding heading forward, never into the preceding question.
         if re.match(r'^Ind\s+AS\s*\d+',t,re.I) and l['bold'] and abs(l['bbox'][0]-margin)<8:headings.append(dict(index=i,page=l['page'],bbox=l['bbox'],text=t,side=side,font=l.get('font',''),size=l.get('size'),rgb=l.get('rgb'),spans=[dict(page=l['page'],bbox=l['bbox'],text=t,font=l.get('font',''),size=l.get('size'),rgb=l.get('rgb'))]))
         elif headings and headings[-1]['side']==side and 0<i-headings[-1]['index']<=3 and l['bold'] and len(t.split())<10 and not re.match(r'\d|Required|SUGGESTED|ANSWERS',t,re.I):
             headings[-1]['text']+=' '+t;headings[-1]['spans'].append(dict(page=l['page'],bbox=l['bbox'],text=t,font=l.get('font',''),size=l.get('size'),rgb=l.get('rgb')))
-        explicit=re.fullmatch(r'Question\s+(\d+)',t,re.I)
+        explicit=re.fullmatch(r'Questions?\s+(\d+)',t,re.I)
         answer_label=re.fullmatch(r'Answer(?:\s+(\d+))?',t,re.I)
         if explicit:side='question';mcq=False;current_number=explicit[1]
         if answer_label and current_number:side='answer';mcq=False
-        if book_style and not explicit and not answer_label:continue
+        if not section_started:continue
+        if book_style and not mcq and not explicit and not answer_label:continue
         m=re.match(r'^(?:Question\s*|Q\s*)?(\d{1,2})\.(?:\s|$)',t,re.I)
         if not explicit and not (answer_label and current_number) and (not m or abs(l['bbox'][0]-margin)>5):continue
         n=int(explicit[1] if explicit else answer_label[1] or current_number if answer_label else m[1]);current_number=str(n)
@@ -263,6 +281,8 @@ def discover(document,metadata):
         next_start=starts[n+1] if n+1<len(starts) else None
         if next_start and next_start['heading'] and next_start['heading']['index']>start['index']:stop=next_start['heading']['index']
         if answer_at and start['side']=='question' and start['index']<answer_at['index']<stop:stop=answer_at['index']
+        for boundary in section:
+            if start['index']<boundary['index']<stop:stop=boundary['index']
         rows=lines[start['index']:stop]
         records.append(dict(reference=start['reference'],subreference='',alternative='',side=start['side'],format=start['format'],heading=start['heading'],lines=rows,start=old.where(rows[0]),end_exclusive=old.where(lines[stop]) if stop<len(lines) else dict(page=len(document),bbox=[0,document[-1].rect.height,0,document[-1].rect.height],column=0),warnings=[]))
     profile=dict(engine=VERSION,source_type=metadata['source_type'],role=metadata.get('role'),source_hash=sha(document.tobytes()) if not document.name else sha(open(document.name,'rb').read()),pages=len(document),learned_number_margin=margin,sections=section,answer_start=answer_at,headings=headings,number_starts=[{k:v for k,v in s.items() if k!='heading'} for s in starts],status='needs_owner_review',layout_notes=['Different source types require separately inspected profiles.','Numbers indented inside working notes are not question starts.'])
@@ -287,9 +307,14 @@ def split_independent(q):
     """Split explicit requirements, not incidental lettered/roman scenario facts."""
     if q['format']!='SUBJECTIVE':return [q],None
     rows=q['lines'];starts=[]
+    # Primary lettered parts share their own left edge. Deeper financial rows
+    # and parenthesised facts must not restart an independent practice entry.
+    part_left=None
     for i,l in enumerate(rows):
         m=re.match(r'^\(([a-z])\)\s*(.*)',l['text'])
-        if m and l['bbox'][0]<=q['start']['bbox'][0]+35:starts.append((m[1],i))
+        if m and l['bbox'][0]<=q['start']['bbox'][0]+35:
+            if part_left is None:part_left=l['bbox'][0]
+            if abs(l['bbox'][0]-part_left)<4:starts.append((m[1],i))
     # Roman requirement lists are scoped beneath their lettered parent.
     if any(re.match(r'^\(ii\)',l['text']) for l in rows):starts=[s for s in starts if s[0] not in ('i','v','x')]
     if len(starts)<2 or len({s[0] for s in starts})!=len(starts):
@@ -319,3 +344,99 @@ def exact_answer(question,paper,answer_documents):
             if a.get('side')!='answer' or a.get('format')!='SUBJECTIVE':continue
             if all((a.get(k) or '')==(question.get(k) or '') for k in ('reference','subreference','alternative')):matches.append(a)
     return matches
+
+
+def paired_parts(question,answer):
+    """Corroborate printed top-level letter parts in both source regions.
+
+    An answer need not contain imperative verbs. Matching sequence, indentation
+    and explicit alternative dividers provide structural evidence, not approval.
+    Inner financial rows and lettered facts in an unlettered parent stay whole.
+    """
+    def markers(record):
+        found=[];left=None
+        for i,line in enumerate(record['lines']):
+            m=re.match(r'^\(([a-h])\)(?:\s|$)',line['text'])
+            if not m or line['bbox'][0]>record['start']['bbox'][0]+35:continue
+            if left is None:
+                # A new part begins next to the question/answer label, rather
+                # than halfway through an unlettered financial statement.
+                if i>3: return []
+                left=line['bbox'][0]
+            if abs(left-line['bbox'][0])<4:found.append((m[1],i))
+        return found
+    qm,am=markers(question),markers(answer)
+    qrefs=[r for r,_ in qm];arefs=[r for r,_ in am]
+    unique=list(dict.fromkeys(qrefs))
+    if not qm and not am:
+        # Independent roman requirements may share one scenario (for example,
+        # journal entries and a consolidated statement). Facts labelled (i)/(ii)
+        # cannot qualify unless every question region has an operative request
+        # and the answer has the same top-level sequence.
+        def romans(record):
+            found=[];left=None
+            for i,line in enumerate(record['lines']):
+                m=re.match(r'^\(([ivx]+)\)(?:\s|$)',line['text'])
+                if not m or line['bbox'][0]>record['start']['bbox'][0]+55:continue
+                if left is None:left=line['bbox'][0]
+                if abs(left-line['bbox'][0])<2:found.append((m[1],i))
+            return found
+        qr,ar=romans(question),romans(answer)
+        expected=['i','ii','iii','iv','v','vi']
+        if 2<=len(qr)<=6 and [r for r,_ in qr]==expected[:len(qr)] and [r for r,_ in ar]==expected[:len(qr)]:
+            operative_parts=[]
+            for n,(_,begin) in enumerate(qr):
+                stop=qr[n+1][1] if n+1<len(qr) else len(question['lines'])
+                text=' '.join(l['text'] for l in question['lines'][begin:stop]);text=re.sub(r'^\([ivx]+\)\s*','',text)
+                operative_parts.append(bool(REQUIREMENT.match(text) or re.match(r'Pass\b|Recommend\b',text,re.I)))
+            if all(operative_parts):qm,am=qr,ar
+        if not qm:return [question],[answer],[]
+    if not qm or not am or (unique!=[chr(97+i) for i in range(len(unique))] and unique!=['i','ii','iii','iv','v','vi'][:len(unique)]) or list(dict.fromkeys(arefs))!=unique:
+        return [question],[answer],['printed_part_sequence_not_corroborated']
+    def split(record,parts):
+        out=[];rows=record['lines'];shared=[l for l in rows[:parts[0][1]] if not re.fullmatch(r'(?:Questions?\s+|Answer\s*)?\d*\.?',l['text'],re.I)]
+        for n,(ref,begin) in enumerate(parts):
+            stop=parts[n+1][1] if n+1<len(parts) else len(rows);content=rows[begin:stop]
+            repeated=n>0 and parts[n-1][0]==ref
+            has_next=n+1<len(parts) and parts[n+1][0]==ref
+            dividers=[i for i,l in enumerate(content) if re.fullmatch('or',l['text'],re.I)]
+            alternatives=[('or' if repeated else 'either' if has_next else '',content)]
+            if dividers and not repeated and not has_next:
+                if len(dividers)!=1:raise ValueError('Multiple alternative dividers need owner review.')
+                at=dividers[0];alternatives=[('either',content[:at]),('or',content[at+1:])]
+            for alternative,body in alternatives:
+                body=[l for l in body if not re.fullmatch('or',l['text'],re.I)]
+                if not body:raise ValueError('Empty alternative region.')
+                start=dict(page=body[0]['page'],bbox=body[0]['bbox'],column=0)
+                next_line=rows[stop] if stop<len(rows) else None
+                # For an Either/Or branch, end before the divider/next branch.
+                last_index=rows.index(body[-1]);boundary=rows[last_index+1] if last_index+1<len(rows) else next_line
+                end=dict(page=boundary['page'],bbox=boundary['bbox'],column=0) if boundary else record['end_exclusive']
+                out.append({**record,'subreference':ref,'alternative':alternative,'lines':body,'shared_lines':shared,'start':start,'end_exclusive':end,'parent_reference':record['reference']})
+        return out
+    questions,answers=split(question,qm),split(answer,am)
+    qi=[(q['subreference'],q['alternative']) for q in questions];ai=[(q['subreference'],q['alternative']) for q in answers]
+    if qi!=ai:return questions,answers,['alternative_identity_not_corroborated']
+    return questions,answers,[]
+
+
+def practice_parts(question,answer):
+    """Also separate explicitly lettered cases within an Either/Or branch.
+
+    Recursion is bounded and requires corroborating answer labels. Shared
+    instructions remain linked common context instead of being discarded.
+    """
+    questions,answers,warnings=paired_parts(question,answer)
+    if warnings:return questions,answers,warnings
+    finalq=[];finala=[]
+    for q,a in zip(questions,answers):
+        if not q['alternative']:
+            finalq.append(q);finala.append(a);continue
+        nestedq,nesteda,issues=paired_parts(q,a)
+        if issues or len(nestedq)==1:
+            finalq.append(q);finala.append(a);continue
+        for qq,aa in zip(nestedq,nesteda):
+            qq={**qq,'subreference':q['subreference']+'.'+qq['subreference'],'alternative':q['alternative'],'shared_lines':q.get('shared_lines',[])+qq.get('shared_lines',[])}
+            aa={**aa,'subreference':a['subreference']+'.'+aa['subreference'],'alternative':a['alternative']}
+            finalq.append(qq);finala.append(aa)
+    return finalq,finala,[]

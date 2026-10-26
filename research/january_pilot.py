@@ -67,7 +67,7 @@ def run(manifest_path,output,previous=None,taxonomy=None):
     if out.exists():raise ValueError('Use a new output revision. Existing review decisions/evidence must be retained.')
     out.mkdir(parents=True);db=sqlite3.connect(out.parent/'january-checkpoints.sqlite')
     db.execute('CREATE TABLE IF NOT EXISTS source_runs (source_hash TEXT,engine_hash TEXT,payload TEXT,created_at TEXT,PRIMARY KEY(source_hash,engine_hash))')
-    engine=gold.sha(b''.join(Path(path).read_bytes() for path in (gold.__file__,__file__,fr_package.__file__,layout_engine.__file__)));old=json.loads(Path(previous).read_text()) if previous else []
+    engine=gold.sha(b''.join(Path(path).read_bytes() for path in (gold.__file__,__file__,fr_package.__file__,layout_engine.__file__,__import__('fr_corpus').__file__)));old=json.loads(Path(previous).read_text()) if previous else []
     prior={(r['import_record']['source_hash'],r['import_record']['reference'],r['import_record']['subreference']):r for r in old}
     taxonomy=json.loads(Path(taxonomy).read_text()) if taxonomy else {'nodes':[],'editions':[]};edition=manifest['edition_key'];taxonomy['nodes']=[n for n in taxonomy['nodes'] if n['edition_key']==edition];taxonomy['editions']=[n for n in taxonomy['editions'] if n['edition_key']==edition]
     rows=[];exceptions=[];inventory=[];table_report=[];reconciliation=[];profiles=[];scenarios={}
@@ -75,6 +75,20 @@ def run(manifest_path,output,previous=None,taxonomy=None):
     for found in discovered.values():
         source=found['source'];identity=tuple(source.get(k) for k in ('source_hash','subject_code','source_type','exam_attempt','mtp_series'))
         if source.get('role') in ('answers','questions_and_answers') and identity not in seen_answers:pool.append({**source,'records':found['records']});seen_answers.add(identity)
+    paired_questions={};pairing_warnings={}
+    for found in discovered.values():
+        source=found['source'];answer_hash=source.get('answer_document_hash',source['source_hash'] if source.get('role')=='questions_and_answers' else None)
+        candidates=[a for a in pool if a['source_hash']==answer_hash and all(a.get(k)==source.get(k) for k in ('subject_code','source_type','exam_attempt','mtp_series'))]
+        if len(candidates)!=1:continue
+        target=candidates[0]
+        for question in [q for q in found['records'] if q['side']=='question' and q['format']=='SUBJECTIVE']:
+            answers=[a for a in target['records'] if a['side']=='answer' and a['format']=='SUBJECTIVE' and a['reference']==question['reference'] and not a['subreference']]
+            if len(answers)!=1:continue
+            try:children,answer_children,warnings=gold.practice_parts(question,answers[0])
+            except ValueError as error:warnings=['paired_layout_requires_owner_review: '+str(error)]
+            if warnings:pairing_warnings[(source['source_hash'],question['reference'])]=warnings;continue
+            paired_questions[(source['source_hash'],question['reference'])]=children
+            index=target['records'].index(answers[0]);target['records'][index:index+1]=answer_children
     for source in manifest['sources']:
         if source.get('subject_code')!='FR' or source.get('exam_attempt')!='January 2026':raise ValueError('This worker accepts the January 2026 FR pilot only.')
         src=deepcopy(source);local=src.pop('local_path',None)
@@ -88,10 +102,11 @@ def run(manifest_path,output,previous=None,taxonomy=None):
             records=discovered[src['key']]['records'];profile=deepcopy(discovered[src['key']]['profile']);profile['source']=src;profiles.append(profile);write(out/'layout-profiles'/f"{src['key']}.json",profile)
             db.execute('INSERT OR IGNORE INTO source_runs VALUES (?,?,?,?)',(digest,engine,json.dumps(profile),datetime.now(timezone.utc).isoformat()));db.commit()
             paper={**src,'answer_document_hash':src.get('answer_document_hash',digest if src.get('role')=='questions_and_answers' else None)}
-            qs=[r for r in records if r['side']=='question' and r['format']=='SUBJECTIVE'];mcqs=[r for r in records if r['side']=='question' and r['format']=='MCQ'];source_rows=[]
+            qs=[r for r in records if r['side']=='question' and r['format']=='SUBJECTIVE'] if source.get('emit_questions',True) else [];mcqs=[r for r in records if r['side']=='question' and r['format']=='MCQ'];source_rows=[]
             write(out/src['key']/'preserved-mcqs.json',[{k:v for k,v in r.items()} for r in mcqs])
             for parent in qs:
                 children,ambiguity=gold.split_independent(parent)
+                if (digest,parent['reference']) in paired_questions:children=paired_questions[(digest,parent['reference'])];ambiguity=None
                 if ambiguity:exceptions.append({'source':src['key'],**ambiguity,'required_action':'Owner to distinguish background facts from independent requirements.'})
                 for q in children:
                     key=(digest,q['reference'],q['subreference']);prev=prior.get(key);old_record=deepcopy(prev['import_record']) if prev else None
@@ -101,13 +116,14 @@ def run(manifest_path,output,previous=None,taxonomy=None):
                     d.update(stable_id=stable,title=src['title'],official_url=src.get('official_url',''),question_page=str(q['start']['page'])+'-'+str(max(l['page'] for l in q['lines'])),question_coordinates={'start':q['start'],'end_exclusive':q['end_exclusive']},heading_evidence=q['heading'] or {},source_revision=digest,engine_revision={'engine':gold.VERSION,'engine_hash':engine},question_format='subjective',question_type=src.get('question_types',{}).get(q['reference'],'unknown'),extraction_status='needs_review',source_provenance={'drive_file_id':src['drive_file_id']} if src.get('drive_file_id') else {},practice_structure={'parent_stable_id':old_record['stable_id'] if len(children)>1 and old_record else '', 'alternative':q['alternative'],'layout_profile':src['key'],'boundary_signature':gold.sha(json.dumps([q['start'],q['end_exclusive']],sort_keys=True)),'quality_required':True},quality_checks={})
                     if answer_source and answer_source.get('drive_file_id'):d['source_provenance']['answer_drive_file_id']=answer_source['drive_file_id']
                     if q.get('shared_lines'):
-                        shared=q['shared_lines'];common={**q,'lines':shared,'start':dict(page=shared[0]['page'],bbox=shared[0]['bbox'],column=0),'end_exclusive':q['start']};body=gold.reconstruct(common,document)
+                        shared=q['shared_lines'];last=shared[-1];end=dict(page=last['page'],bbox=[last['bbox'][0],last['bbox'][3]+.1,last['bbox'][2],last['bbox'][3]+.1],column=0);common={**q,'lines':shared,'start':dict(page=shared[0]['page'],bbox=shared[0]['bbox'],column=0),'end_exclusive':end};body=gold.reconstruct(common,document)
                         group=q['subreference'].split('.')[0] if '.' in q['subreference'] else 'root';scenario_key='SC-'+digest[:16]+'-Q'+q['reference']+'-'+group;d['practice_structure']['scenario_key']=scenario_key
                         scenarios[scenario_key]=dict(source_hash=digest,scenario_key=scenario_key,body_html=body['body_html'],rights_basis=d['rights_basis'],evidence=dict(start=common['start'],end=common['end_exclusive']))
                     d['blocking_exceptions']=list(dict.fromkeys(qrich['warnings']+(arich['warnings'] if arich else ['exact_answer_not_established'])+['owner_visual_comparison_required']))
+                    d['blocking_exceptions']+=pairing_warnings.get((digest,parent['reference']),[])
                     # The earlier source-specific unresolved Q19/corrigendum is retained.
                     if digest in manifest.get('held_answer_references',{}) and q['reference'] in manifest['held_answer_references'][digest]:d['blocking_exceptions'].append('prior_answer_conflict_or_corrigendum_requires_owner_decision')
-                    tags=manifest.get('classification_proposals',{}).get(src['key'],{}).get(q['reference'],{})
+                    tags=manifest.get('classification_proposals',{}).get(src['key'],{}).get(q['reference']+(('('+q['subreference']+')') if q['subreference'] else '')+((':'+q['alternative']) if q['alternative'] else ''),{})
                     selected,primary_path,missing_nodes=proposed_paths(tags.get('node_keys',[]),taxonomy['nodes'])
                     if missing_nodes:d['blocking_exceptions'].append('historical_topic_key_not_found')
                     # Exact official node keys are proposed, never approved or remapped.
@@ -122,7 +138,7 @@ def run(manifest_path,output,previous=None,taxonomy=None):
                     for kind,rich in [('question',qrich),('answer',arich)]:
                         if not rich:continue
                         for n,model in enumerate(b for b in rich['blocks'] if b['type']=='table'):
-                            name=src['key']+'-Q'+q['reference']+q['subreference']+'-'+kind+'-T'+str(n+1);box=fitz.Rect(model['bbox']);box+=(-8,-8,8,8);image=out/'private-source-evidence'/(name+'.png');image.parent.mkdir(exist_ok=True)
+                            name=src['key']+'-Q'+q['reference']+q['subreference']+('-'+q['alternative'] if q['alternative'] else '')+'-'+kind+'-T'+str(n+1);box=fitz.Rect(model['bbox']);box+=(-8,-8,8,8);image=out/'private-source-evidence'/(name+'.png');image.parent.mkdir(exist_ok=True)
                             if kind=='answer' and answer_source['local_path']!=local:
                                 with fitz.open(answer_source['local_path']) as answer_pdf:answer_pdf[model['page']-1].get_pixmap(clip=box,matrix=fitz.Matrix(1.5,1.5)).save(image)
                             else:document[model['page']-1].get_pixmap(clip=box,matrix=fitz.Matrix(1.5,1.5)).save(image)

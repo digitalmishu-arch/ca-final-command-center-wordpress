@@ -34,6 +34,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_gold_layout.py' -v
       - name: Compact private academic package manifest and privacy checks
         run: python3 -m unittest discover -s tests -p 'test_academic_package.py' -v
+      - name: Paired source sections, plural labels and alternatives
+        run: python3 -m unittest discover -s tests -p 'test_january_collection.py' -v
       - name: Build public research CODE artifact
         run: python3 scripts/build-research.py
       - uses: actions/upload-artifact@v4

@@ -66,6 +66,8 @@ def all_lines(document):
                 if not text: continue
                 main = max(spans, key=lambda s: len(s['text'])); c = main['color']
                 box = [round(float(x), 2) for x in l['bbox']]
+                if text == str(p.number + 1) and box[1] > p.rect.height * .82 and abs((box[0]+box[2])/2-p.rect.width/2)<45:
+                    continue  # A centred printed page number is not a financial amount.
                 # Keep the title/section information, exclude only running furniture.
                 if box[1] < (135 if p.rect.width>590 and 'Segoe' in main['font'] else 65) and p.number > 0: continue
                 if box[1] > p.rect.height * (.84 if p.rect.width>590 and 'Segoe' in main['font'] else .94): continue

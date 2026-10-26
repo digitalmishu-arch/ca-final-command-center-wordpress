@@ -1,3 +1,9 @@
+# January 2026 private collection processing
+
+Continues PR #12 and unchanged WordPress **0.5.2**. The offline worker now handles anchored Part I/II sections, plural question labels, corroborated question/answer parts, bounded nested Either/Or cases, centred page-number furniture, unique comparison evidence and recorded currency-glyph normalisation. [Processing and importer notes](docs/v051/JANUARY-COLLECTION.md).
+
+All seven owner-selected PDFs have now been read privately. The four available source groups produce 55 provisional subjective practice entries, with 55 MCQs retained separately. Academic approval remains outstanding. The question-labelled examination upload contains the same 41-page suggested-answer book text as the answer upload; the separate standalone-paper counterpart remains an explicit exception. No private source prose or owner decisions are in public code/CI.
+
 # Version 0.5.2 — January 2026 corrective software
 
 Continues PR #12. Adds scan-free, administrator-attested physical ICAI permissions, an exact private source register with labelled mirror citations, one ZIP academic import with checksum/dependency preview and resumable checkpoints, and one-confirmation owner publication. [Install, import, review, source coverage and rollback instructions](docs/v051/CORRECTIVE-0.5.2.md).
