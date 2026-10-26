@@ -110,8 +110,11 @@ def expand_financial_rows(page,model):
         if physical<model.get('header_rows',1) or len(anchors)<2 or any(c['rowspan']>1 for c in cells):
             result.extend({**c,'row':row_number} for c in cells);row_number+=1;continue
         for n,y in enumerate(anchors):
-            top=(anchors[n-1]+y)/2 if n else min([c['bbox'][1] for c in cells]+[v[0] for group in bands.values() for v in group])-1
-            bottom=(y+anchors[n+1])/2 if n+1<len(anchors) else max(c['bbox'][3] for c in cells)
+            # Amounts normally align with the first line of an accounting stub.
+            # Midpoints wrongly move a wrapped label/working-note continuation
+            # to the next amount. Keep continuation lines until the next start.
+            top=y-4 if n else min([c['bbox'][1] for c in cells]+[v[0] for group in bands.values() for v in group])-1
+            bottom=anchors[n+1]-4 if n+1<len(anchors) else max(c['bbox'][3] for c in cells)
             for c in cells:
                 text='\n'.join(t for baseline,t in bands[c['column']] if top<=baseline<bottom)
                 if '₹' in c['text']:text=text.replace('`','₹')

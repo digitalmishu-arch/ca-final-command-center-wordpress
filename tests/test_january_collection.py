@@ -11,6 +11,17 @@ def region(rows,side='question'):return dict(lines=rows,reference='2',subreferen
 
 
 class JanuaryCollection(unittest.TestCase):
+    def test_wrapped_stub_and_working_note_stay_with_their_amount(self):
+        with fitz.open() as d:
+            p=d.new_page()
+            for x in [72,280,400]:p.draw_line((x,80),(x,215))
+            for y in [80,110,215]:p.draw_line((72,y),(400,y))
+            p.insert_text((80,100),'Description');p.insert_text((290,100),'TEST value')
+            for y,text in [(130,'TEST long liability'),(150,'(deferred consideration)'),(170,'(TEST working note)'),(195,'TEST trade payables')]:p.insert_text((80,y),text)
+            p.insert_text((290,130),'4.95');p.insert_text((290,195),'13.50')
+            m,error=g.table_model(p,p.find_tables(strategy='lines_strict').tables[0],[0,0,595,842]);self.assertFalse(error);m=g.expand_financial_rows(p,m);grid={(c['row'],c['column']):c['text'] for c in m['cells']}
+            self.assertIn('(TEST working note)',grid[(1,0)]);self.assertEqual(grid[(1,1)],'4.95');self.assertEqual(grid[(2,0)],'TEST trade payables');self.assertEqual(grid[(2,1)],'13.50')
+
     def test_unit_amount_and_financial_section_rows_keep_their_own_values(self):
         with fitz.open() as d:
             p=d.new_page()
