@@ -40,3 +40,17 @@
 .cc-portal a{color:var(--cc-link)}.cc-portal .cc-portal-nav a{color:#e1edf9}.cc-portal .cc-portal-nav a[aria-current=page]{color:#fff}
 
 .cc-portal .cc-stat strong{color:var(--cc-ink)}.cc-portal .cc-completed strong{color:#7054bc}.cc-portal[data-cc-theme=dark] .cc-completed strong{color:#c8b2ff}.cc-portal :is(.cc-stable-id,.cc-result-count,.cc-mcq-options legend){color:var(--cc-muted)}
+
+/* v0.7: one rich-reader palette in both themes. Never inherit pale ink on a pale answer. */
+.cafcc-v2 .cc-answer-panel{background:var(--cc-soft,#eee9f8);color:var(--cc-ink,#14263f);border-color:var(--cc-border,#8398ad);border-left-color:var(--cc-link,#006e77)}
+.cafcc-v2 :is(.cc-question-content,.cc-answer-panel) .cc-rich-content{color:var(--cc-ink,#14263f);background:var(--cc-panel,#fff);border-radius:8px;padding:12px;opacity:1;isolation:isolate}
+.cafcc-v2 .cc-rich-content :is(p,div,span,h3,h4,h5,h6,strong,b,em,i,u,li,ol,ul,blockquote,pre,code,sup,sub,var,math,mi,mn,mo,mrow,mfrac,msqrt,msup,msub,mtext,caption){color:inherit!important;-webkit-text-fill-color:currentColor!important;opacity:1}
+.cafcc-v2 .cc-rich-content table{border-collapse:collapse;border-spacing:0;width:auto;min-width:0;max-width:100%;color:var(--cc-ink,#14263f);background:var(--cc-panel,#fff);font-variant-numeric:tabular-nums}
+.cafcc-v2 .cc-rich-content :is(td,th){color:var(--cc-ink,#14263f)!important;-webkit-text-fill-color:var(--cc-ink,#14263f)!important;background:var(--cc-panel,#fff)!important;border:1px solid var(--cc-border,#8398ad);opacity:1;vertical-align:top;overflow-wrap:normal;word-break:normal;min-width:4rem}
+.cafcc-v2 .cc-rich-content th{background:var(--cc-soft,#eaf2f8)!important;font-weight:750}
+.cafcc-v2 .cc-rich-content :is(td,th):empty{min-width:2rem}
+.cafcc-v2 .cc-rich-content a{color:var(--cc-link,#006e77)!important;-webkit-text-fill-color:currentColor!important;text-decoration:underline}
+.cafcc-v2 .cc-rich-content :is(small,.cc-footnote),.cafcc-v2 :is(.cc-credit,.cc-meta,.cc-answer-panel>.cc-meta){color:var(--cc-muted,#445b73)}
+.cafcc-v2 .cc-rich-content mark,.cafcc-v2 mark[data-study-highlight]{background:#ffe195!important;color:#17283e!important;-webkit-text-fill-color:#17283e!important;box-shadow:0 0 0 1px #d7a530;opacity:1}
+.cafcc-v2 .cc-answer-panel :is(h3,h4,h5){color:var(--cc-ink,#14263f)}
+.cafcc-v2 .cc-answer-panel>.cc-meta{padding:10px 12px;border:1px solid var(--cc-border,#8398ad);border-radius:8px;background:var(--cc-panel,#fff)}

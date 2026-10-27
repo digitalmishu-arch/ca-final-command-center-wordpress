@@ -4,3 +4,9 @@
 
 /* Let a wide accounting table scroll inside its reader, never widen the grid. */
 .cafcc-v2 .cc-workspace>*{min-width:0}.cafcc-v2 .cc-results,.cafcc-v2 .cc-question-list,.cafcc-v2 .cc-question{min-width:0;max-width:100%}.cc-portal .cc-source-citations{overflow-wrap:anywhere}@media(max-width:760px){.cafcc-v2 .cc-workspace{grid-template-columns:minmax(0,1fr)}}
+
+/* Shared reader controls never impose a light-only colour on a dark reader. */
+.cc-portal :is(.cc-stopwatch,.cc-reader-toolbar,.cc-study-card,.cc-session-history){color:var(--cc-ink);background:var(--cc-soft);border-color:var(--cc-border)}
+.cc-portal .cc-study-feedback{color:var(--cc-ink)}
+.cc-portal :is(.cc-reader-modes,.cc-reader-navigation) button{color:var(--cc-ink);background:var(--cc-panel);border:1px solid var(--cc-border)}
+.cc-portal .cc-reader-modes button[aria-pressed=true]{background:var(--cc-chip);color:var(--cc-chip-ink);border-color:var(--cc-link)}
