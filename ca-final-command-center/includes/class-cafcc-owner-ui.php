@@ -5,7 +5,13 @@ defined('ABSPATH') || exit;
 final class CAFCC_Owner_UI {
     public static $advanced=array();
     public static function init(){
-        add_action('admin_menu',function(){if(!CAFCC_Repository::admin_allowed())return;global $submenu;foreach($submenu['cafcc']??array() as $item){if($item[2]!=='cafcc')self::$advanced[]=array('title'=>wp_strip_all_tags($item[0]),'slug'=>$item[2]);remove_submenu_page('cafcc',$item[2]);}
+        add_action('admin_menu',function(){if(!CAFCC_Repository::admin_allowed())return;global $submenu;$legacy=$submenu['cafcc']??array();foreach($legacy as $item)remove_submenu_page('cafcc',$item[2]);foreach($legacy as $item){if($item[2]!=='cafcc'){
+                self::$advanced[]=array('title'=>wp_strip_all_tags($item[0]),'slug'=>$item[2]);
+                // Removing a submenu also removes WordPress's parent lookup. Register
+                // a hidden route that delegates to the original secured screen hook.
+                $original=get_plugin_page_hookname($item[2],'cafcc');
+                add_submenu_page('',$item[3]??$item[0],$item[0],$item[1],$item[2],function()use($original){do_action($original);});
+            }}
             add_submenu_page('cafcc','Dashboard','Dashboard','manage_options','cafcc',array('CAFCC_Admin','render'));
             foreach(array('cafcc-upload'=>'Upload Questions','cafcc-library'=>'Question Library','cafcc-students'=>'Students','cafcc-settings'=>'Settings') as $slug=>$title)add_submenu_page('cafcc',$title,$title,'manage_options',$slug,array(__CLASS__,'screen'));
         },999);
