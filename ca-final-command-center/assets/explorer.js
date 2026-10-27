@@ -60,7 +60,7 @@
                 card.append(head, node('h4', q.title), node('p', q.chapter_title + ' · ' + q.syllabus_version, 'cc-meta'));
                 const tags = node('div', undefined, 'cc-tags');
                 q.classifications.forEach(t => tags.append(node('span', t.title + (t.heading_origin === 'editorial' ? ' · Editorial' : ' · ICAI'), 'cc-tag')));
-                card.append(tags);
+                (q.academic_tags||[]).filter(t=>t.kind==='standard'||t.kind==='concept'||t.kind==='owner_tag').forEach(t=>{const chip=node('button',t.label,'cc-tag');chip.type='button';chip.title='Provisional academic search tag';chip.onclick=()=>{fields.search.value=t.label;page=1;refresh();};tags.append(chip);});card.append(tags);if(q.academic_status)card.append(node('p',q.academic_status,'cc-meta'));if(q.answer_status==='pending')card.append(node('p','Answer Pending — this question is available while its solution is checked.','cc-meta'));
                 if (q.practice_content) {
                     const content = q.practice_content, question = node('details', undefined, 'cc-question-content'); question.open = true;
                     const body = node('div', undefined, 'cc-rich-content');
@@ -95,7 +95,7 @@
                     panel.replaceChildren(node('p', 'Loading reviewed answer references…')); answerButton.disabled = true;
                     try {
                         const result = await api('answers/' + q.id + (q.occurrence_id ? '?occurrence_id=' + q.occurrence_id : ''));if(answerToken!==answerGeneration)return; panel.replaceChildren();
-                        if (!result.items.length) panel.append(node('p', result.empty_message));
+                        if(result.notice)panel.append(node('p',result.notice,'cc-meta'));if (!result.items.length) panel.append(node('p', result.empty_message));
                         result.items.forEach(a => {
                             if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.attribution?' · '+a.attribution:'') + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body);if(a.official_url)panel.append(link(a.official_url,(a.hosting_label==='Owner-verified ICAI mirror'?'Verified mirror answer source':'Official answer source')+' · '+(a.verified_page||a.source_location),a.hosting_label==='Owner-verified ICAI mirror')); }
                             else if (a.mode === 'official_link') panel.append(node('p', 'Official answer · ' + a.source_location), link(a.official_url, 'View Official Answer'));
@@ -129,7 +129,7 @@
                 if (loadCatalog) {
                     const data = await api('catalog?' + params()); if (token !== generation) return;
                     fill('subject_id', data.subjects, 'All subjects', s => s.code + ' — ' + s.name);
-                    fill('edition_id', data.editions.filter(e => !fields.subject_id.value || fields.subject_id.selectedOptions[0]?.textContent.startsWith('IBS') || String(e.subject_id) === fields.subject_id.value), 'All reviewed editions', e => e.title);
+                    fill('edition_id', data.editions.filter(e => !fields.subject_id.value || fields.subject_id.selectedOptions[0]?.textContent.startsWith('IBS') || String(e.subject_id) === fields.subject_id.value), 'All available editions', e => e.title);
                     fields.edition_id.disabled = false;
                     fill('exam_attempt', data.exam_attempts, 'All available attempts', s => s + (data.attempt_metadata?.find(a=>a.value===s)?.has_questions?' · Practice available':' · No verified questions yet')); fill('source_type', data.source_types, 'All available sources', s => sourceLabels[s] || s);
                     await Promise.all(['chapter', 'unit', 'topic', 'subtopic'].map(async type => {
@@ -137,11 +137,11 @@
                         const term = root.querySelector('[data-facet-search="' + key + '"]').value; if (term) filter.set('term', term);
                         const result = await api('concepts?' + filter); if (token !== generation) return;
                         const old = fields[key].selectedOptions[0], value = fields[key].value;
-                        fill(key, result.items, 'Any reviewed ' + type, n => n.title + ' · ' + n.subject_code + ' · ' + n.edition_title + (n.has_questions?'':' · No verified questions yet'));
+                        fill(key, result.items, 'Any available ' + type, n => n.title + ' · ' + n.subject_code + ' · ' + n.edition_title + (n.has_questions?'':' · No verified questions yet'));
                         if (value && ![...fields[key].options].some(o => o.value === value) && old) { fields[key].append(old.cloneNode(true)); fields[key].value = value; }
                         fields[key].disabled = false; fields[key]._concepts = result.items;
                     }));
-                    root.querySelector('.cc-edition-note').textContent = 'Start with any filter. Browse Syllabus includes reviewed headings without questions; Practice Questions uses eligible occurrences. Some chapters have no numbered ICAI unit.';
+                    root.querySelector('.cc-edition-note').textContent = 'Start with any filter. Browse Syllabus includes source-backed and owner-authorised provisional headings without questions; Practice Questions uses eligible occurrences. Some chapters have no numbered ICAI unit.';
                 }
                 drawChips();
                 const [questions, counts] = await Promise.all([api('questions?' + params()), api('summary?' + params())]); if (token !== generation) return;
@@ -176,7 +176,8 @@
             results.replaceChildren(); if (input.value.trim().length < 2) { input.setAttribute('aria-expanded','false'); return; }
             try { const result = await api('concepts?scope='+scope+'&term=' + encodeURIComponent(input.value.trim())); if (generation !== conceptGeneration) return;
                 result.items.forEach(item => { const button = node('button', item.title + ' · ' + item.subject_code + ' · ' + item.edition_title+(item.has_questions?'':' · No verified questions yet')); button.type = 'button'; button.setAttribute('role','option'); button.addEventListener('click', () => chooseConcept(item)); results.append(button); });
-                if (!result.items.length) results.append(node('p','No reviewed syllabus path matches yet. Unreviewed drafts stay private.')); input.setAttribute('aria-expanded','true');
+                (result.tag_suggestions||[]).forEach(item=>{const b=node('button',item.label+' · '+item.subject_code+' · '+item.edition_title+' · Suggested search tag');b.type='button';b.setAttribute('role','option');b.onclick=()=>{fields.search.value=item.label;fields.subject_id.value=item.subject_id;if(![...fields.edition_id.options].some(o=>o.value===String(item.edition_id)))fields.edition_id.append(option(item.edition_id,item.edition_title));fields.edition_id.value=item.edition_id;['chapter_id','unit_id','topic_id','subtopic_id'].forEach(k=>fields[k].value='');results.replaceChildren();input.setAttribute('aria-expanded','false');page=1;refresh();};results.append(b);});
+                if (!result.items.length&&!(result.tag_suggestions||[]).length) results.append(node('p','No reviewed syllabus path matches yet. Unreviewed drafts stay private.')); input.setAttribute('aria-expanded','true');
             } catch(e) { tell(e.message,true); }
         }, 250); });
         input.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); results.querySelector('button')?.focus(); } if (e.key === 'Escape') { results.replaceChildren(); input.setAttribute('aria-expanded','false'); } });

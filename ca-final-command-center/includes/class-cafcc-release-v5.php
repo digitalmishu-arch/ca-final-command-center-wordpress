@@ -16,7 +16,7 @@ final class CAFCC_Release_V5 {
         return true;
     }
     public static function format($data){if(($data['question_type']??'')==='mcq'||preg_match('/\bmcq\b|multiple.choice|objective/i',$data['section']??''))return 'mcq';$value=strtolower($data['question_format']??'');if(in_array($value,array('subjective','mcq','mixed'),true))return $value;$section=$data['section']??'';if(($data['question_type']??'')==='mcq'||preg_match('/\bmcq\b|multiple.choice|objective/i',$section))return 'mcq';return preg_match('/descriptive|subjective/i',$section)||in_array($data['question_type']??'',array('theory','practical'),true)?'subjective':'mixed';}
-    public static function guard($alias){return " AND $alias.question_format='subjective' AND ($alias.pilot_gate=0 OR $alias.manual_quality_pass=1)".CAFCC_Rights::public_guard($alias);}
+    public static function guard($alias){return " AND $alias.question_format='subjective' AND ($alias.pilot_gate=0 OR $alias.manual_quality_pass=1 OR ($alias.owner_publication='provisional' AND $alias.owner_revision=$alias.revision)) AND $alias.archived=0".CAFCC_Rights::public_guard($alias);}
     public static function clean_content($value,$rights_mode,$basis){
         if(!is_array($value)||array_diff(array_keys($value),array('question','answer')))return CAFCC_Repository::error('Use question and answer rich-content fields.');
         if($value&&(!in_array($rights_mode,array('original','licensed_private_review','licensed_public'),true)||!$basis))return CAFCC_Repository::error('Full private content requires an explicit authorised storage basis.');

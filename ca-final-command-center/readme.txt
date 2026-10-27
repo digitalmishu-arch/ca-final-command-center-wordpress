@@ -3,7 +3,7 @@ Contributors: digitalmishu-arch
 Tags: education, student-progress, academic-references
 Requires at least: 6.6
 Requires PHP: 8.1
-Stable tag: 0.5.3
+Stable tag: 0.6.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -33,3 +33,6 @@ Additive schema 7: private source register and resumable academic ZIP checkpoint
 
 = 0.5.3 =
 Preserve exact repeated spaces when anchoring private highlights in approved PDF-derived HTML. Skip unresolved DOM anchors safely. No database migration or content approval; compatible with the 0.5.2 academic package importer.
+
+= 0.6.0 =
+Five-section owner workspace, exact dataset membership, one confirmed provisional batch publication, source-backed canonical reuse without false independent verification, Ind AS/SA suggestions, answer-pending isolation, revision-safe correction and reversible archiving. Schema 8 is additive; no activation-time publication, entitlement or data deletion.

@@ -205,7 +205,7 @@ final class CAFCC_Academic {
     }
 
     public static function row_published($row) {
-        if (!$row || 'verified'!==($row['review_status']??'') || 'published'!==($row['publication_status']??'')) { return false; }
+        if (!$row || (!(!empty($row['owner_enabled']) && ($row['review_status']??'')!=='rejected') && ('verified'!==($row['review_status']??'') || 'published'!==($row['publication_status']??'')))) { return false; }
         if (!empty($row['batch_id'])) {
             global $wpdb; $table=CAFCC_DB::table('import_batches');
             return 'committed'===$wpdb->get_var($wpdb->prepare("SELECT status FROM $table WHERE id=%d",$row['batch_id']));

@@ -29,7 +29,7 @@ jobs:
         if: matrix.legacy == '0'
         uses: actions/upload-artifact@v4
         with:
-          name: ca-final-command-center-0.5.3
+          name: ca-final-command-center-0.6.0
           path: dist/ca-final-command-center.zip
           if-no-files-found: error
           retention-days: 30
@@ -49,12 +49,13 @@ jobs:
         run: CAFCC_TEST_WEBKIT=1 bash tests/run-browser.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: v052-authored-browser-previews
+          name: v060-authored-browser-previews
           path: |
             docs/previews/v04-*.png
             docs/previews/v041-*.png
             docs/previews/v05-*.png
             docs/previews/v051-*.png
             docs/previews/v052-*.png
+            docs/previews/v06-*.png
           if-no-files-found: error
           retention-days: 30

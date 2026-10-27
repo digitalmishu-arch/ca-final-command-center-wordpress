@@ -7,6 +7,7 @@ run_id="cafcc-test-${RANDOM}-$$"
 wp_container="${run_id}-wp"
 db_container="${run_id}-db"
 cleanup() {
+    if [[ "${CAFCC_KEEP_FAILURE:-0}" == 1 ]]; then printf '%s\n' "$wp_container" "$db_container" "$run_id" > work/preview-containers.txt; return; fi
     docker rm -fv "$wp_container" "$db_container" >/dev/null 2>&1 || true
     docker network rm "$run_id" >/dev/null 2>&1 || true
 }

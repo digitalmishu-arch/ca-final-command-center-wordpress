@@ -21,6 +21,7 @@ final class CAFCC_Admin {
     }
 
     public static function render() {
+        if(class_exists('CAFCC_Owner_UI'))return CAFCC_Owner_UI::screen();
         if (!CAFCC_Repository::admin_allowed()) {
             wp_die('Administrator access is required.', '', array('response' => 403));
         }
