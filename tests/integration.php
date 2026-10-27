@@ -64,6 +64,11 @@ CAFCC_Sources::init();
 CAFCC_Package::init();
 CAFCC_Owner::init();
 CAFCC_Owner_UI::init();
+CAFCC_Library::init();
+CAFCC_Public_Sources::init();
+CAFCC_Standards::init();
+CAFCC_MCQ_Admin::init();
+CAFCC_MCQ_Student::init();
 add_filter('pre_wp_mail',function(){return true;});
 foreach(array($student_a,$student_b) as $test_uid){$r=CAFCC_Access::get($test_uid);$grant=CAFCC_Access::decide($test_uid,array('expected_version'=>$r['version'],'action'=>'approve','plan_key'=>'test-original-fixtures','expires_at'=>'','legacy_identity_verified'=>true));if(is_wp_error($grant))throw new RuntimeException($grant->get_error_message());}
 require __DIR__ . "/v04-baseline-fixtures.php";
@@ -248,4 +253,5 @@ require __DIR__ . "/v05.php";
 require __DIR__ . "/v051.php";
 require __DIR__ . "/v052.php";
 require __DIR__ . "/v06.php";
+require __DIR__ . "/v07.php";
 echo "\n$count integration assertions passed on WordPress " . get_bloginfo('version') . ', PHP ' . PHP_VERSION . ".\n";

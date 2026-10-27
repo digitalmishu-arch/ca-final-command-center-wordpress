@@ -6,20 +6,23 @@
     const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
     const option = (value, label) => { const n = node('option', label); n.value = value; return n; };
     async function api(path, body, v1 = false, practice = false) {
+        const v9=path.startsWith('v9/');if(v9)path=path.slice(3);
         const [route, query = ''] = path.split('?');
-        const target = new URL((practice ? CAFCCExplorer.practice : v1 ? CAFCCExplorer.v1 : CAFCCExplorer.url) + route);
+        const target = new URL((v9?CAFCCExplorer.library:practice ? CAFCCExplorer.practice : v1 ? CAFCCExplorer.v1 : CAFCCExplorer.url) + route);
         new URLSearchParams(query).forEach((value, key) => target.searchParams.set(key, value));
         const response = await fetch(target, {method: body ? 'PUT' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: {'X-WP-Nonce': CAFCCExplorer.nonce, 'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'The request failed. Reload and try again.');
         return data;
     }
-    function link(url, label, verifiedMirror = false) {
+    function link(url, label, verifiedMirror = false, ownerPublic = false) {
         const u = new URL(url);
-        if (u.protocol !== 'https:' || (!/(^|\.)(icai\.org|icai\.nic\.in)$/.test(u.hostname) && !verifiedMirror) || /(^|\.)(drive|docs)\.google\.com$/.test(u.hostname)) return node('span', 'Official source unavailable');
+        const drive=u.hostname==='drive.google.com'&&/^\/file\/d\/[A-Za-z0-9_-]{10,120}\/view$/.test(u.pathname)&&ownerPublic;
+        if (u.protocol !== 'https:' || (!/(^|\.)(icai\.org|icai\.nic\.in)$/.test(u.hostname) && !verifiedMirror&&!drive) || (/(^|\.)(drive|docs)\.google\.com$/.test(u.hostname)&&!drive)) return node('span', 'Official source unavailable');
         const a = node('a', label, 'cc-source-link'); a.href = u.href; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a;
     }
     document.querySelectorAll('[data-cafcc-explorer]').forEach(root => {
+        const readerOnly=root.hasAttribute('data-reader-only');
         const fields = Object.fromEntries([...root.querySelectorAll('[data-filter]')].map(n => [n.dataset.filter, n]));
         const chain = ['subject_id', 'edition_id', 'chapter_id', 'unit_id', 'topic_id', 'subtopic_id'];
         const jump = node('button', 'Filters ↑', 'cc-mobile-filters'); jump.type = 'button';
@@ -32,7 +35,7 @@
         function params() {
             const p = new URLSearchParams({page: String(page),scope});
             Object.entries(fields).forEach(([key, field]) => { if (field.type === 'checkbox') { if (field.checked) p.set(key, '1'); } else if (field.value.trim()) p.set(key, field.value.trim()); });
-            if(root.dataset.view==='practice')p.set('personal',fields.personal?.value||'all');const address=new URL(location.href);for(const key of ['page','scope',...Object.keys(fields)])address.searchParams.delete(key);p.forEach((v,k)=>{if(k!=='private_tag')address.searchParams.set(k,v);});history.replaceState(null,'',address);return p.toString();
+            if(readerOnly)return p.toString();if(root.dataset.view==='practice')p.set('personal',fields.personal?.value||'all');const address=new URL(location.href);for(const key of ['page','scope',...Object.keys(fields)])address.searchParams.delete(key);p.forEach((v,k)=>{if(k!=='private_tag')address.searchParams.set(k,v);});history.replaceState(null,'',address);return p.toString();
         }
         function fill(key, rows, first, text) {
             const select = fields[key], selected = select.value;
@@ -56,7 +59,7 @@
                 card.dataset.subject = q.subject_code;
                 card.dataset.questionId = q.id;
                 const head = node('div', undefined, 'cc-card-top'); head.append(node('span', q.subject_code, 'cc-subject cc-subject-' + q.subject_code.toLowerCase()), node('span', q.stable_key, 'cc-stable-id'));
-                const citations=node('div',undefined,'cc-source-citations');(q.source_citations||[]).forEach(c=>{const location=c.page?.match(/\d+/)?.[0],target=new URL(c.url);if(location)target.hash='page='+location;const a=link(target.href,c.authored?'Independently authored example · official syllabus background':c.label+(c.hosting_label==='Owner-verified ICAI mirror'?' · Verified mirror':''),c.hosting_label==='Owner-verified ICAI mirror');a.title=c.hosting_label||'Verified source PDF';a.classList.add('cc-official-citation');citations.append(a);});card.append(citations);
+                const citations=node('div',undefined,'cc-source-citations');(q.source_citations||[]).forEach(c=>{const location=c.page?.match(/\d+/)?.[0],target=new URL(c.url);if(location&&c.page_jump_supported!==false&&!c.owner_public_copy)target.hash='page='+location;const a=link(target.href,c.authored?'Independently authored example · official syllabus background':c.label+(c.owner_public_copy?' · PDF page '+(c.page||'see source'):c.hosting_label==='Owner-verified ICAI mirror'?' · Verified mirror':''),c.hosting_label==='Owner-verified ICAI mirror',c.owner_public_copy===true);a.title=c.hosting_label||'Verified source PDF';a.classList.add('cc-official-citation');citations.append(a);});card.append(citations);
                 card.append(head, node('h4', q.title), node('p', q.chapter_title + ' · ' + q.syllabus_version, 'cc-meta'));
                 const tags = node('div', undefined, 'cc-tags');
                 q.classifications.forEach(t => tags.append(node('span', t.title + (t.heading_origin === 'editorial' ? ' · Editorial' : ' · ICAI'), 'cc-tag')));
@@ -82,7 +85,7 @@
                     const source = node('div', undefined, 'cc-occurrence');
                     source.append(node('span', sourceLabels[o.source_type] || o.source_type, 'cc-source-type'), node('strong', o.title));
                     const details = [o.exam_attempt,o.document_section ? 'Section ' + o.document_section : '', o.issue_period, o.mtp_series ? 'Series ' + o.mtp_series : '', o.page_reference ? 'Page ' + o.page_reference : '', 'Q ' + o.question_number + (o.subquestion_number ? ' (' + o.subquestion_number + ')' : ''), o.marks !== null ? o.marks + ' verified marks' : ''].filter(Boolean);
-                    source.append(node('p', details.join(' · '), 'cc-meta'), link(o.official_url, o.source_type==='other'&&q.practice_content?.rights_label==='Independently authored'?'Official ICAI background resource':(q.source_citations?.find(c=>c.occurrence_id===Number(o.id))?.hosting_label==='Owner-verified ICAI mirror'?'Open Verified Mirror PDF':'Open Official Question Source'),q.source_citations?.find(c=>c.occurrence_id===Number(o.id))?.hosting_label==='Owner-verified ICAI mirror')); sources.append(source);
+                    source.append(node('p', details.join(' · '), 'cc-meta'), link(o.official_url, o.source_type==='other'&&q.practice_content?.rights_label==='Independently authored'?'Official ICAI background resource':(o.owner_public_copy?'Open Google Drive source PDF':q.source_citations?.find(c=>c.occurrence_id===Number(o.id))?.hosting_label==='Owner-verified ICAI mirror'?'Open Verified Mirror PDF':'Open Official Question Source'),q.source_citations?.find(c=>c.occurrence_id===Number(o.id))?.hosting_label==='Owner-verified ICAI mirror',o.owner_public_copy===true)); sources.append(source);
                 });
                 card.append(sources);
                 const actions = node('div', undefined, 'cc-card-actions'), answerButton = node('button', 'Show Answer', 'cc-secondary'), panel = node('div', undefined, 'cc-answer-panel');
@@ -97,8 +100,8 @@
                         const result = await api('answers/' + q.id + (q.occurrence_id ? '?occurrence_id=' + q.occurrence_id : ''));if(answerToken!==answerGeneration)return; panel.replaceChildren();
                         if(result.notice)panel.append(node('p',result.notice,'cc-meta'));if (!result.items.length) panel.append(node('p', result.empty_message));
                         result.items.forEach(a => {
-                            if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.attribution?' · '+a.attribution:'') + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body);if(a.official_url)panel.append(link(a.official_url,(a.hosting_label==='Owner-verified ICAI mirror'?'Verified mirror answer source':'Official answer source')+' · '+(a.verified_page||a.source_location),a.hosting_label==='Owner-verified ICAI mirror')); }
-                            else if (a.mode === 'official_link') panel.append(node('p', 'Official answer · ' + a.source_location), link(a.official_url, 'View Official Answer'));
+                            if (a.mode === 'permitted_html') { const body = node('div', undefined, 'cc-rich-content'); body.innerHTML = a.body_html; panel.append(node('p', a.rights_label + ' · ' + a.author_name + (a.attribution?' · '+a.attribution:'') + (a.source_location ? ' · ' + a.source_location : ''), 'cc-credit'), body);if(a.official_url)panel.append(link(a.official_url,(a.owner_public_copy?'Google Drive answer PDF':a.hosting_label==='Owner-verified ICAI mirror'?'Verified mirror answer source':'Official answer source')+' · '+(a.verified_page||a.source_location),a.hosting_label==='Owner-verified ICAI mirror',a.owner_public_copy===true)); }
+                            else if (a.mode === 'official_link') panel.append(node('p', 'Official answer · ' + a.source_location), link(a.official_url, 'View Official Answer'+(a.verified_page?' · PDF page '+a.verified_page:''),false,a.owner_public_copy===true));
                             else panel.append(node('strong', a.rights_label), node('p', a.answer_text, 'cc-solution-text'));
                         });
                     } catch (e) {if(answerToken===answerGeneration)panel.replaceChildren(node('p', e.message, 'cc-error')); }
@@ -144,11 +147,25 @@
                     root.querySelector('.cc-edition-note').textContent = 'Start with any filter. Browse Syllabus includes source-backed and owner-authorised provisional headings without questions; Practice Questions uses eligible occurrences. Some chapters have no numbered ICAI unit.';
                 }
                 drawChips();
+                await standardFacets(token);
                 const [questions, counts] = await Promise.all([api('questions?' + params()), api('summary?' + params())]); if (token !== generation) return;
                 drawQuestions(questions); drawSummary(counts); tell('');
             } catch (e) { if (token === generation) tell(e.message, true); }
             finally { if (token === generation) root.removeAttribute('aria-busy'); }
         }
+        async function standardFacets(token){
+            if(readerOnly)return;const p=new URLSearchParams(params());p.delete('search');const [s,c]=await Promise.all([api('v9/standards?'+p),api('v9/standard-concepts?'+p)]);if(token!==generation)return;
+            const currentStandard=fields.standard.value,currentConcept=fields.concept.value;
+            fill('standard',s.items,'All tagged standards',n=>n.label+' · '+n.questions+' questions');
+            fill('concept',c.items,'All matching concepts',n=>n.label+' · '+n.origin+' · '+n.questions+' questions');
+            if(currentConcept&&![...fields.concept.options].some(o=>o.value===currentConcept))fields.concept.value='';
+            if(currentStandard!==fields.standard.value)drawChips();
+        }
+        fields.standard.addEventListener('change',()=>{fields.concept.value='';['chapter_id','unit_id','topic_id','subtopic_id'].forEach(k=>fields[k].value='');page=1;refresh();});
+        fields.concept.addEventListener('change',()=>{page=1;refresh(false);});
+        const standardInput=root.querySelector('[data-standard-search]'),standardResults=root.querySelector('[data-standard-suggestions]');let standardTimer,standardGeneration=0;
+        standardInput.addEventListener('input',()=>{clearTimeout(standardTimer);const stamp=++standardGeneration;standardTimer=setTimeout(async()=>{try{const p=new URLSearchParams(params());p.set('term',standardInput.value);p.delete('search');const d=await api('v9/standards?'+p);if(stamp!==standardGeneration)return;standardResults.replaceChildren();for(const item of d.items){const b=node('button',item.label+' · '+item.questions+' questions');b.type='button';b.setAttribute('role','option');b.onclick=()=>{const subject=[...fields.subject_id.options].find(o=>o.textContent.startsWith(item.subject_code+' —'));if(subject)fields.subject_id.value=subject.value;fields.edition_id.value='';['chapter_id','unit_id','topic_id','subtopic_id'].forEach(k=>fields[k].value='');if(![...fields.standard.options].some(o=>o.value===item.code))fields.standard.append(option(item.code,item.label));fields.standard.value=item.code;fields.concept.value='';fields.search.value='';standardResults.replaceChildren();standardInput.value=item.label;standardInput.setAttribute('aria-expanded','false');page=1;refresh();};standardResults.append(b);}if(!d.items.length)standardResults.append(node('p','No eligible published questions have this standard under the selected filters.'));standardInput.setAttribute('aria-expanded','true');}catch(e){tell(e.message,true);}},250);});
+        standardInput.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();standardResults.querySelector('button')?.focus();}if(e.key==='Escape'){standardResults.replaceChildren();standardInput.setAttribute('aria-expanded','false');}});
         function drawChips() {
             const chips = root.querySelector('.cc-filter-chips'); chips.replaceChildren();
             Object.entries(fields).forEach(([key, f]) => { if (key==='personal'||!f.value || (f.type === 'checkbox' && !f.checked)) return;
@@ -158,6 +175,7 @@
             });
         }
         function chooseConcept(item) {
+            fields.standard.value='';fields.concept.value='';standardInput.value='';standardResults.replaceChildren();
             if(!fields.subject_id.selectedOptions[0]?.textContent.startsWith('IBS'))fields.subject_id.value = item.subject_id; if(![...fields.edition_id.options].some(o=>o.value===String(item.edition_id)))fields.edition_id.append(option(item.edition_id,item.edition_title)); fields.edition_id.value = item.edition_id; fields.search.value='';
             ['chapter_id','unit_id','topic_id','subtopic_id'].forEach(k => { fields[k].value = ''; });
             item.ancestors.forEach(a => { const f = fields[a.type + '_id']; if (f) { if (![...f.options].some(o => o.value === String(a.id))) f.append(option(a.id, a.title)); f.value = a.id; } });
@@ -187,10 +205,10 @@
         if(fields.private_tag)fields.private_tag.addEventListener('change',()=>{page=1;refresh(false);});
         fields.bookmarked.addEventListener('change', () => { page = 1; refresh(false); });
         root.querySelector('.cc-search').addEventListener('submit', e => { e.preventDefault(); page = 1; refresh(false); });
-        root.querySelector('.cc-reset').addEventListener('click', () => { Object.values(fields).forEach(f => { if (f.type === 'checkbox') f.checked = false; else f.value = f===fields.personal?'all':''; }); root.querySelectorAll('[data-facet-search],.cc-concept-input').forEach(f => { f.value=''; }); results.replaceChildren(); root.querySelector('.cc-selected-path').textContent=''; page = 1; refresh(); });
+        root.querySelector('.cc-reset').addEventListener('click', () => { Object.values(fields).forEach(f => { if (f.type === 'checkbox') f.checked = false; else f.value = f===fields.personal?'all':''; }); root.querySelectorAll('[data-facet-search],.cc-concept-input,[data-standard-search]').forEach(f => { f.value=''; }); results.replaceChildren();standardResults.replaceChildren(); root.querySelector('.cc-selected-path').textContent=''; page = 1; refresh(); });
         root.querySelectorAll('[data-scope]').forEach(b=>b.addEventListener('click',()=>{scope=b.dataset.scope;root.querySelectorAll('[data-scope]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));results.replaceChildren();input.setAttribute('aria-expanded','false');page=1;refresh();}));
         root.querySelectorAll('[data-scope]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.scope===scope)));
-        document.addEventListener('cafcc:activity',()=>{if(root.isConnected)api('summary?'+params()).then(drawSummary).catch(()=>{});});
-        refresh();
+        document.addEventListener('cafcc:activity',()=>{if(!readerOnly&&root.isConnected)api('summary?'+params()).then(drawSummary).catch(()=>{});});
+        if(readerOnly){root.addEventListener('cafcc:open-reader',event=>{const q=event.detail;drawQuestions({items:[q],total:1,per_page:1,page:1});root.querySelector('.cc-pagination').hidden=true;root.dispatchEvent(new CustomEvent('cafcc:reader-ready',{detail:q}));});}else refresh();
     });
 })();
