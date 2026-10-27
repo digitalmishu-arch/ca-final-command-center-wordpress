@@ -1,3 +1,11 @@
+# Version 0.6.0 — simple owner publication
+
+Continue from PR #12 / 0.5.3. **Upload ZIP → Preview → Publish All → eligible questions visible.** One explicit owner batch confirmation can publish academically provisional content, without certifying every question or taxonomy node as independently verified. Genuine integrity, rights, privacy, subjective-only and entitlement controls remain enforced. Existing r016 ZIP bytes are compatible; no academic package replacement is required.
+
+[One-page iPad guide](docs/v06/IPAD.md) · [Architecture, policy and migration](docs/v06/ARCHITECTURE.md). Code/CI contains original software fixtures only; private r016 content is tested outside public CI. No Hostinger deployment or merge is performed.
+
+---
+
 # January 2026 private collection processing
 
 Continues PR #12 and the WordPress **0.5.2** foundation. The **0.5.3** patch fixes exact-space private highlight anchors found during source-derived browser testing; the schema and academic importer are unchanged. The offline worker now handles anchored Part I/II sections, plural question labels, corroborated question/answer parts, bounded nested Either/Or cases, centred page-number furniture, unique comparison evidence and recorded currency-glyph normalisation. [Processing and importer notes](docs/v051/JANUARY-COLLECTION.md).

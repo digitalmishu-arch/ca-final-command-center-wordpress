@@ -86,7 +86,7 @@ final class CAFCC_Explorer {
 
     public static function public_nodes($edition_id=null,$subject_id=null) {
         global $wpdb;
-        $n=CAFCC_DB::table('taxonomy'); $where=CAFCC_Academic::published('n'); $args=array();
+        $n=CAFCC_DB::table('taxonomy'); $where=CAFCC_Owner::usable_sql('n'); $args=array();
         if ($edition_id) { $where.=' AND n.edition_id=%d'; $args[]=$edition_id; }
         if ($subject_id) { $where.=' AND n.subject_id=%d'; $args[]=$subject_id; }
         $sql="SELECT n.* FROM $n n WHERE $where ORDER BY n.position,n.id LIMIT 10000";
@@ -103,7 +103,7 @@ final class CAFCC_Explorer {
     private static function occurrence_where($o='o',$d='od',$dm='odm') {
         $e=CAFCC_DB::table('editions');
         return ('1=1'.(class_exists('CAFCC_Studio')?CAFCC_Studio::occurrence_guard($o):''))." AND ".CAFCC_Academic::published($o)." AND $d.verification_status='verified' AND $d.official_url<>'' AND ".CAFCC_Academic::published($dm).
-            " AND EXISTS (SELECT 1 FROM $e oe WHERE oe.id=$o.edition_id AND ".CAFCC_Academic::published('oe').")";
+            " AND EXISTS (SELECT 1 FROM $e oe WHERE oe.id=$o.edition_id AND ".CAFCC_Owner::usable_sql('oe').")";
     }
 
     public static function query_parts($f,$user_id) {
@@ -112,8 +112,8 @@ final class CAFCC_Explorer {
         $st=CAFCC_DB::table('question_subjects'); $oc=CAFCC_DB::table('occurrences'); $docs=CAFCC_DB::table('documents'); $dm=CAFCC_DB::table('document_meta'); $ed=CAFCC_DB::table('editions');
         $from=CAFCC_Repository::visible_from()." LEFT JOIN $qm qm ON qm.question_id=q.id LEFT JOIN $p p ON p.question_id=q.id AND p.user_id=%d";
         $where=CAFCC_Repository::visible_where(); $args=array($user_id);
-        $tagpub=CAFCC_Academic::published('ft'). ' AND '.CAFCC_Academic::published('fn');
-        $where.=" AND (qm.id IS NULL OR (EXISTS (SELECT 1 FROM $ed qe WHERE qe.id=qm.edition_id AND ".CAFCC_Academic::published('qe').") AND EXISTS (SELECT 1 FROM $oc o JOIN $docs od ON od.id=o.document_id JOIN $dm odm ON odm.document_id=od.id WHERE o.question_id=q.id AND ".self::occurrence_where().")))";
+        $tagpub=CAFCC_Academic::published('ft'). ' AND '.CAFCC_Owner::usable_sql('fn');
+        $where.=" AND (qm.id IS NULL OR (EXISTS (SELECT 1 FROM $ed qe WHERE qe.id=qm.edition_id AND ".CAFCC_Owner::usable_sql('qe').") AND EXISTS (SELECT 1 FROM $oc o JOIN $docs od ON od.id=o.document_id JOIN $dm odm ON odm.document_id=od.id WHERE o.question_id=q.id AND ".self::occurrence_where().")))";
         if (!empty($f['subject_id'])) {
             $where.=" AND (COALESCE(qm.primary_subject_id,c.subject_id)=%d OR EXISTS (SELECT 1 FROM $st fs WHERE fs.question_id=q.id AND fs.subject_id=%d AND ".CAFCC_Academic::published('fs').") OR EXISTS (SELECT 1 FROM $tag ft JOIN $n fn ON fn.id=ft.node_id WHERE ft.question_id=q.id AND fn.subject_id=%d AND $tagpub))";
             array_push($args,$f['subject_id'],$f['subject_id'],$f['subject_id']);
@@ -179,7 +179,7 @@ final class CAFCC_Explorer {
 
     public static function tags($id) {
         global $wpdb; $t=CAFCC_DB::table('question_tags'); $n=CAFCC_DB::table('taxonomy');
-        $rows=$wpdb->get_results($wpdb->prepare("SELECT n.id,n.title,n.node_type,n.heading_origin,n.source_url FROM $t t JOIN $n n ON n.id=t.node_id WHERE t.question_id=%d AND ".CAFCC_Academic::published('t')." AND ".CAFCC_Academic::published('n'),$id),ARRAY_A);
+        $rows=$wpdb->get_results($wpdb->prepare("SELECT n.id,n.title,n.node_type,n.heading_origin,n.source_url FROM $t t JOIN $n n ON n.id=t.node_id WHERE t.question_id=%d AND ".CAFCC_Academic::published('t')." AND ".CAFCC_Owner::usable_sql('n'),$id),ARRAY_A);
         return array_values(array_filter($rows,function($n){return CAFCC_Academic::path_published($n['id']);}));
     }
 
@@ -193,7 +193,7 @@ final class CAFCC_Explorer {
 
     public static function catalog($f) {
         global $wpdb; $s=CAFCC_DB::table('subjects'); $e=CAFCC_DB::table('editions');
-        $where=CAFCC_Academic::published('e'); $args=array();
+        $where=CAFCC_Owner::usable_sql('e'); $args=array();
         if ($f['subject_id']) { $where.=' AND e.subject_id=%d'; $args[]=$f['subject_id']; }
         $sql="SELECT e.id,e.subject_id,e.title,e.edition_key,e.edition_month,e.reprint_month,e.applicability,e.date_note,e.source_url FROM $e e WHERE $where ORDER BY e.id";
         $editions=$wpdb->get_results($args?$wpdb->prepare($sql,$args):$sql,ARRAY_A);
