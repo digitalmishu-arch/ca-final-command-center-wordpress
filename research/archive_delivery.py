@@ -118,6 +118,7 @@ def build(manifest_path, worker_path, release_path, output, revision):
         book_path = next(base.glob('*Owner-Review-*.xlsx'))
         book = load_workbook(book_path)
         colour = COLOURS[subject]
+        sheet(book, 'Source Inventory', fields, [[r[k] for k in fields] for r in flat if r['collection_subject'] == subject], colour)
         for i, row in enumerate(rows, 2):
             r = row['import_record']
             book['Questions'].cell(i, 17, r['question_type'])
