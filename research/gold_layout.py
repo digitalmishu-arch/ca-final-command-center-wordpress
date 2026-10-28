@@ -102,7 +102,7 @@ def expand_financial_rows(page,model):
         cells=[c for c in model['cells'] if c['row']==physical];bands={}
         for c in cells:
             bands[c['column']]=word_groups(page,c['bbox'])
-        amounts=[y for c in cells if c['column']>0 for y,t in bands[c['column']] if re.fullmatch(AMOUNT+r'(?:\s*(?:lakhs?|crores?|millions?|billions?|thousands?|units?|kg|MT))?',t,re.I)]
+        amounts=[y for c in cells if c['column']>0 for y,t in bands[c['column']] if re.fullmatch(AMOUNT+r'(?:\s*(?:lakhs?|crores?|millions?|billions?|thousands?|units?|shares?|paise|kg|MT))?',t,re.I)]
         section_rows=[y for c in cells if c['column']==0 for y,t in bands[c['column']] if re.fullmatch(r'(?:Assets|Liabilities|Equity(?: and Liabilities)?|Other equity|Reserves and surplus|Non.current (?:assets|liabilities)|Current (?:assets|liabilities)|Shareholders?[’\']? equity|Financial (?:assets|liabilities)|Cash flows from[^:]*|Adjustments for[^:]*):?',re.sub(r'^[\s•▪\-–]+','',t),re.I)]
         anchors=[]
         for y in sorted(amounts+section_rows):

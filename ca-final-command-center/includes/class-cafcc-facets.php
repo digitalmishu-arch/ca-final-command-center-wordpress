@@ -11,7 +11,7 @@ final class CAFCC_Facets {
         $status=$r->get_param('practice_status')??'';if(!is_string($status)||($status&&!in_array($status,CAFCC_Repository::STATUSES,true)))return CAFCC_Repository::error('Invalid practice status.');$f['practice_status']=$status;$personal=$r->get_param('personal')??'';if(!is_string($personal)||!in_array($personal,array('','all','bookmarks','needs_revision','important','difficult','notes','highlighted','recent'),true))return CAFCC_Repository::error('Invalid personal practice view.');$f['personal']=$personal;$tag=$r->get_param('private_tag')??'';if(!is_string($tag)||strlen($tag)>60)return CAFCC_Repository::error('Invalid private tag filter.');$f['private_tag']=sanitize_text_field($tag);$f['node_ids']=array();
         foreach(array('chapter','unit','topic','subtopic') as $type){$key=$type.'_id';$id=CAFCC_Repository::id($r->get_param($key),true);if(is_wp_error($id))return $id;$f[$key]=$id;if(!$id)continue;$n=CAFCC_Academic::get('taxonomy',$id);
             if(!$n||$n['node_type']!==$type||!CAFCC_Academic::path_published($id)||(!$ibs&&$subject&&(int)$n['subject_id']!==$subject)||($f['edition_id']&&(int)$n['edition_id']!==$f['edition_id']))return CAFCC_Repository::error('The selected concept is unavailable or has conflicting subject/edition context.');$f['node_ids'][]=$id;
-        }return $f;
+        }$academic=CAFCC_Standards::filters($r);if(is_wp_error($academic))return $academic;return array_merge($f,$academic);
     }
     public static function parts($f,$uid){
         global $wpdb;
@@ -30,7 +30,7 @@ final class CAFCC_Facets {
         if(!empty($f['search'])){if(CAFCC_Search_Tags::standard_query($f['search'])){$where.=' AND '.CAFCC_Search_Tags::search_sql('q.id',$f['search'],$args);}else{$like='%'.$wpdb->esc_like($f['search']).'%';$content=CAFCC_Practice::table('content');
             $rt=CAFCC_Studio::table();$tagargs=array();$tagsql=CAFCC_Search_Tags::search_sql('q.id',$f['search'],$tagargs);$where.=" AND (EXISTS(SELECT 1 FROM $rt public_id WHERE public_id.question_id=q.id AND public_id.publication_status='published' AND public_id.status='approved' AND public_id.question_format='subjective' AND public_id.stable_id LIKE %s) OR q.title LIKE %s OR q.question_number LIKE %s OR qm.stable_key LIKE %s OR EXISTS (SELECT 1 FROM $content pc WHERE pc.question_id=q.id AND pc.content_kind='question' AND ".CAFCC_Practice::permitted_sql('pc')." AND pc.search_text LIKE %s) OR EXISTS (SELECT 1 FROM $t st JOIN $cl sc ON sc.descendant_id=st.node_id JOIN $n sn ON sn.id=sc.ancestor_id WHERE st.question_id=q.id AND ".CAFCC_Academic::published('st')." AND ".CAFCC_Owner::usable_sql('sn')." AND (sn.title LIKE %s OR EXISTS(SELECT 1 FROM $aliases sa WHERE sa.node_id=sn.id AND sa.review_status='verified' AND sa.alias_text LIKE %s))) OR $tagsql)";
             array_push($args,$like,$like,$like,$like,$like,$like,$like);array_push($args,...$tagargs);}
-        }return array($from,$where,$args);
+        }$where.=CAFCC_Standards::condition('q',$f,$args);return array($from,$where,$args);
     }
     public static function node_search($r){
         global $wpdb;$f=self::filters($r);if(is_wp_error($f))return $f;
@@ -57,17 +57,26 @@ final class CAFCC_Facets {
         $tag_suggestions=array();if($term&&!$type){$terms=CAFCC_Search_Tags::table();$editions=CAFCC_DB::table('editions');$ta=$args;$term_predicate=CAFCC_Search_Tags::predicate('academic_term',$term,$ta);$tag_suggestions=$wpdb->get_results($wpdb->prepare("SELECT DISTINCT academic_term.label,academic_term.kind,s.code AS subject_code,s.id AS subject_id,qm.edition_id,te.title AS edition_title $from JOIN $terms academic_term ON academic_term.question_id=q.id JOIN $editions te ON te.id=qm.edition_id WHERE $where AND $term_predicate ORDER BY academic_term.label LIMIT 10",$ta),ARRAY_A);}return array('tag_suggestions'=>$tag_suggestions,'items'=>$rows,'more'=>$more,'scope'=>$scope,'availability'=>$scope==='browse'?'Available source-backed or owner-authorised provisional paths; questions may not yet be available.':'Reviewed paths with eligible published questions.');
     }
     public static function context($id){$node=CAFCC_Academic::get('taxonomy',$id);$path=array();if(!$node)return $path;foreach(array_reverse(CAFCC_Explorer::ancestors($node)) as $nid){$r=CAFCC_Academic::get('taxonomy',$nid);$path[]=array('id'=>(int)$nid,'type'=>$r['node_type'],'title'=>$r['title']);}return $path;}
-    public static function questions($r){
-        global $wpdb;$f=self::filters($r);if(is_wp_error($f))return $f;
-        list($from,$where,$args)=self::parts($f,get_current_user_id());$o=CAFCC_DB::table('occurrences');$od=CAFCC_DB::table('documents');$dm=CAFCC_DB::table('document_meta');
+    public static function occurrence_parts($f,$uid){
+        global $wpdb;
+        list($from,$where,$args)=self::parts($f,$uid);$o=CAFCC_DB::table('occurrences');$od=CAFCC_DB::table('documents');$dm=CAFCC_DB::table('document_meta');
         $from.=" JOIN $o bo ON bo.question_id=q.id JOIN $od bd ON bd.id=bo.document_id JOIN $dm bm ON bm.document_id=bd.id";
         $where.=' AND '.CAFCC_Academic::published('bo').' AND '.CAFCC_Academic::published('bm')." AND bd.verification_status='verified'";
         if(class_exists('CAFCC_Studio'))$where.=CAFCC_Studio::occurrence_guard('bo');
         foreach(array('source_type','exam_attempt','mtp_series') as $key){if(!empty($f[$key])){$where.=" AND ".($key==='mtp_series'?'bm':'bd').".$key=%s";$args[]=$f[$key];}}
+        return array($from,$where,$args);
+    }
+    public static function questions($r){
+        global $wpdb;$f=self::filters($r);if(is_wp_error($f))return $f;
+        list($from,$where,$args)=self::occurrence_parts($f,get_current_user_id());
         $total=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) $from WHERE $where",$args));$qa=$args;array_push($qa,20,($f['page']-1)*20);
         $rows=$wpdb->get_results($wpdb->prepare("SELECT q.id,q.title,q.question_number,c.title AS chapter_title,c.syllabus_version,s.code AS subject_code,qm.edition_id,qm.stable_key,qm.question_type,bo.id AS occurrence_id,COALESCE(p.status,'not_started') AS progress_status $from WHERE $where ORDER BY bo.id DESC LIMIT %d OFFSET %d",$qa),ARRAY_A);
+        return array('items'=>self::hydrate($rows),'total'=>$total,'per_page'=>20,'page'=>$f['page']);
+    }
+    public static function hydrate($rows){
+        global $wpdb;
         foreach($rows as &$q){$q['occurrences']=array_values(array_filter(CAFCC_Explorer::occurrences($q['id']),function($o)use($q){return (int)$o['id']===(int)$q['occurrence_id'];}));$q['classifications']=CAFCC_Explorer::tags($q['id']);$q['practice_content']=class_exists('CAFCC_Studio')?CAFCC_Studio::occurrence_content((int)$q['id'],(int)$q['occurrence_id'],'question'):CAFCC_Practice::public_content((int)$q['id'],'question');$q['notebook']=CAFCC_Practice::notebook((int)$q['id']);$q['legacy_reference']=false;if(class_exists('CAFCC_Studio')){$rt=CAFCC_Studio::table();$context=$wpdb->get_var($wpdb->prepare("SELECT JSON_EXTRACT(payload,'$.classification_context') FROM $rt WHERE occurrence_id=%d AND publication_status='published'",$q['occurrence_id']));$q['primary_classification']=json_decode($context?:'{}',true);$q['source_citations']=array();foreach($q['occurrences'] as $occ){$title=$q['primary_classification']['topic']['title']??$q['primary_classification']['chapter']['title']??$q['chapter_title'];$standard='';if(preg_match('/Ind\s+AS\s*\d+/i',$q['primary_classification']['chapter']['title']??$q['chapter_title'],$m))$standard=$m[0];if($standard)$title=$standard;$label=implode(' · ',array_filter(array(strtoupper($occ['source_type']),$q['subject_code'],$occ['exam_attempt'],$occ['mtp_series']?'Series '.$occ['mtp_series']:'','Q'.$occ['question_number'].($occ['subquestion_number']?'('.$occ['subquestion_number'].')':''),$title)));$q['source_citations'][]=array('occurrence_id'=>(int)$occ['id'],'label'=>$label,'url'=>$occ['official_url'],'page'=>$occ['page_reference'],'hosting_label'=>CAFCC_Sources::hosting($occ['official_url']),'authored'=>$occ['source_type']==='other'&&($q['practice_content']['rights_label']??'')==='Independently authored');}if(!empty($q['primary_classification']['chapter']['title']))$q['chapter_title']=$q['primary_classification']['chapter']['title'];}}
-        foreach($rows as &$card){$rt=CAFCC_Studio::table();$rr=$wpdb->get_row($wpdb->prepare("SELECT id,owner_publication,owner_answer_state FROM $rt WHERE occurrence_id=%d AND publication_status='published'",$card['occurrence_id']),ARRAY_A);$card['academic_tags']=$rr?CAFCC_Search_Tags::for_review($rr['id']):array();$card['academic_status']=($rr['owner_publication']??'')==='provisional'?'Owner-authorised · Academic verification pending':'Owner-reviewed publication';$card['answer_status']=$rr['owner_answer_state']??'available';}return array('items'=>$rows,'total'=>$total,'per_page'=>20,'page'=>$f['page']);
+        foreach($rows as &$card){$rt=CAFCC_Studio::table();$rr=$wpdb->get_row($wpdb->prepare("SELECT id,source_hash,owner_publication,owner_answer_state FROM $rt WHERE occurrence_id=%d AND publication_status='published'",$card['occurrence_id']),ARRAY_A);$card['academic_tags']=$rr?CAFCC_Search_Tags::for_review($rr['id']):array();$card['academic_status']=($rr['owner_publication']??'')==='provisional'?'Owner-authorised · Academic verification pending':'Owner-reviewed publication';$card['answer_status']=$rr['owner_answer_state']??'available';if($rr&&class_exists('CAFCC_Public_Sources'))$card=CAFCC_Public_Sources::question($card,$rr['source_hash']);}return $rows;
     }
     public static function summary($r){
         global $wpdb;$f=self::filters($r);if(is_wp_error($f))return $f;list($from,$where,$args)=self::parts($f,get_current_user_id());

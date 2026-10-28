@@ -5,7 +5,7 @@ defined('ABSPATH') || exit;
 final class CAFCC_Search_Tags {
     public static function table(){global $wpdb;return $wpdb->prefix.'cafcc_academic_search_tags';}
     public static function catalog(){static $v=null;if($v===null)$v=json_decode(file_get_contents(dirname(__DIR__).'/data/standards-reference.json'),true);return $v;}
-    public static function normalise($s){$s=strtolower(remove_accents($s));$s=preg_replace('/ind\s*as\s*(\d+)/i','ind as $1',$s);$s=preg_replace('/\bsa\s*(\d+)/i','sa $1',$s);return trim(preg_replace('/[^a-z0-9]+/',' ',$s));}
+    public static function normalise($s){$s=strtolower(remove_accents($s));$s=preg_replace('/\bind[\s._-]*as\b/i','ind as',$s);$s=preg_replace('/\bind[\s._-]*as[\s._-]*(\d+)/i','ind as $1',$s);$s=preg_replace('/\bsa[\s._-]*(\d+)/i','sa $1',$s);return trim(preg_replace('/[^a-z0-9]+/',' ',$s));}
     public static function suggest($d,$manual=array()){
         $out=array();$add=function($label,$kind,$method,$evidence)use(&$out){$label=sanitize_text_field($label);$key=self::normalise($label);if(!$key||strlen($label)>190||CAFCC_Bank_DB::private_reference($label))return;$out[$key]=array('label'=>$label,'normalised'=>$key,'kind'=>$kind,'origin'=>$method,'evidence'=>sanitize_text_field($evidence),'academic_verification'=>'not_independently_verified');};
         $names=array();foreach($d['classification']??array() as $id){$n=CAFCC_Academic::get('taxonomy',$id);if(!$n)continue;foreach(CAFCC_Explorer::ancestors($n) as $aid){$p=CAFCC_Academic::get('taxonomy',$aid);if(in_array($p['node_type'],array('topic','subtopic','chapter','unit'),true)){$names[]=$p['title'];$add($p['title'],'topic','imported_mapping','Edition-specific proposed path; not independent verification.');}}}
@@ -24,6 +24,6 @@ final class CAFCC_Search_Tags {
     }
     public static function for_review($id){global $wpdb;return $wpdb->get_results($wpdb->prepare('SELECT label,kind,origin FROM '.self::table().' WHERE review_id=%d ORDER BY id',$id),ARRAY_A);}
     public static function standard_query($term){return (bool)preg_match('/^(?:sa|ind as)(?: \d+)?$/D',self::normalise($term));}
-    public static function predicate($alias,$term,&$args){global $wpdb;$normal=self::normalise($term);if(self::standard_query($term)){$args[]=$normal;$args[]=$wpdb->esc_like($normal).' %';return "($alias.kind IN ('standard','owner_tag') AND ($alias.normalised=%s OR $alias.normalised LIKE %s))";}$args[]='%'.$wpdb->esc_like($normal).'%';return "$alias.normalised LIKE %s";}
+    public static function predicate($alias,$term,&$args){global $wpdb;$normal=self::normalise($term);$aliases=array('revenue recognition'=>'revenue from contracts with customers','financial instrument'=>'financial instruments','held for sale'=>'non current assets held for sale and discontinued operations');$normal=$aliases[$normal]??$normal;if(self::standard_query($term)){$args[]=$normal;$args[]=$wpdb->esc_like($normal).' %';return "($alias.kind IN ('standard','owner_tag') AND ($alias.normalised=%s OR $alias.normalised LIKE %s))";}$args[]='%'.$wpdb->esc_like($normal).'%';return "$alias.normalised LIKE %s";}
     public static function search_sql($qid,$term,&$args){return 'EXISTS(SELECT 1 FROM '.self::table()." academic_search WHERE academic_search.question_id=$qid AND ".self::predicate('academic_search',$term,$args).')';}
 }

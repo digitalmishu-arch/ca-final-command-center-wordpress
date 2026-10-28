@@ -1,0 +1,43 @@
+{
+  "version": "1",
+  "checked_on": "2026-10-27",
+  "scope": "Exact owner-authorised, anyone-reader January 2026 FR PDF copies only. Not private research or permission evidence.",
+  "sources": [
+    {
+      "sha256": "8bdb55ac0ffd3f01a96c5caac07326d4529d30acf8963094828a348e9b22c737",
+      "drive_file_id": "1QClWQAfewta_6IHTbyH2fmnH2HDTGBNh",
+      "role": "questions_and_answers",
+      "title": "ICAI January 2026 Financial Reporting RTP \u2014 questions and suggested answers"
+    },
+    {
+      "sha256": "e912468d07fedffebc586259fa4fcd86937bafd13f783c54dbbf1972a378eac2",
+      "drive_file_id": "1uCRd5DQw0-8SO3rbXy7mdOSzKq8lr-Jy",
+      "role": "questions",
+      "title": "ICAI Financial Reporting MTP Series I \u2014 17 November 2025 issue, January 2026 target"
+    },
+    {
+      "sha256": "6a62788a22a0010654ad573d605665e12bf1bc246c98390fff0e2cd7212444d5",
+      "drive_file_id": "1umLFhmoTEIWrs23OZKZyhfCub7EmrUqM",
+      "role": "answers",
+      "title": "ICAI Financial Reporting MTP Series I answers \u2014 17 November 2025 issue"
+    },
+    {
+      "sha256": "b060a4a536c51ad85d6390a6e5f5b139c7fc2cb8b32759adf35880a730c7e025",
+      "drive_file_id": "1WtEisnU5RDxWcmAarBj3nd_fiQiGqzG4",
+      "role": "questions",
+      "title": "ICAI Financial Reporting MTP Series II \u2014 4 December 2025 issue, January 2026 target"
+    },
+    {
+      "sha256": "c0b375ec401ec5c46f0729142e853d0e1a7099e341b5046f4201374536b6c143",
+      "drive_file_id": "1xkjsPyAoXW4XQRsAGsg-jM4RYZR-XF6d",
+      "role": "answers",
+      "title": "ICAI Financial Reporting MTP Series II answers \u2014 4 December 2025 issue"
+    },
+    {
+      "sha256": "f0611440f6160a95d9af000c388a9584305de7cf2735ac5dad4fa4822776adcf",
+      "drive_file_id": "1wnwYggQORGWjo_L8n_wpwrfEjX4XJZKv",
+      "role": "questions_and_answers",
+      "title": "ICAI January 2026 Financial Reporting suggested-answer book \u2014 questions included"
+    }
+  ]
+}

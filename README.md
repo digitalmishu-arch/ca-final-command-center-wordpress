@@ -1,3 +1,13 @@
+# Version 0.7.0 — student practice and January MCQs
+
+Continues PR #13 / 0.6.0. Preserves **Upload ZIP → Preview → Publish All → Questions Visible**. Adds readable theme-aware answers/tables, compact personal practice tables, clickable dashboard drill-downs, retained timer-attempt comparison, exact-hash owner-public Drive citations, independent counted Ind AS/SA facets, and a separate MCQ reader with scored attempts and timed practice.
+
+[One-page iPad install and acceptance guide](docs/v07/IPAD.md) · [Architecture and schema 9 migration/rollback](docs/v07/ARCHITECTURE.md) · [Release evidence and limitations](docs/v07/RELEASE.md).
+
+The January MCQ dataset is a **separate private Academic ZIP**: 55 source-derived candidates; 54 single-key candidates and one held examination-key ambiguity. No real records are automatically published. Provisional classification is distinct from independent academic verification. Source-derived datasets/workbooks/screenshots are kept private; public CI uses authored fixtures. No Hostinger access, deployment or merge is performed.
+
+---
+
 # Version 0.6.0 — simple owner publication
 
 Continue from PR #12 / 0.5.3. **Upload ZIP → Preview → Publish All → eligible questions visible.** One explicit owner batch confirmation can publish academically provisional content, without certifying every question or taxonomy node as independently verified. Genuine integrity, rights, privacy, subjective-only and entitlement controls remain enforced. Existing r016 ZIP bytes are compatible; no academic package replacement is required.
