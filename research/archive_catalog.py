@@ -31,6 +31,10 @@ def private(path):
  if (ROOT/'work').resolve() not in p.parents:raise ValueError('Private outputs must remain inside ignored work/.')
  return p
 def clean(text):return re.sub(r'\s+',' ',unicodedata.normalize('NFKC',text)).strip()
+def fingerprint(text,source_hash,image_only=False):
+ # Blank native text is not proof that two scanned papers contain the same
+ # images. Keep substantive signs, decimal points and symbols for corrigenda.
+ return sha('image-only:'+source_hash)if image_only or len(clean(text))<80 else sha(clean(text).casefold())
 def periods(text):return [m[1].title()+' '+m[2]for m in PERIOD.finditer(text)]
 def database(path):
  path=private(path);path.parent.mkdir(parents=True,exist_ok=True);db=sqlite3.connect(path);db.row_factory=sqlite3.Row
@@ -114,7 +118,7 @@ def inspect(file,db,output):
    pages.append(dict(page=p.number+1,width=p.rect.width,height=p.rect.height,text=text,header=head,footer=foot,vertical_rules=vertical,horizontal_rules=horizontal))
   if not pages:raise ValueError('PDF has no pages')
   text='\n'.join(p['text']for p in pages);identity=identify(file,pages)
-  result.update(status='inventoried_from_pdf_bytes',page_count=len(pages),identity=identity,scanned_or_empty_pages=scanned,table_candidate_pages=table_candidates,text_sha256=sha(clean(text)),content_fingerprint=sha(' '.join(re.findall(r'\w+',clean(text).casefold()))),private_extraction_basis='Owner explicitly authorised this six-subject research task',publication_rights='Apply only an existing matching administrator rights declaration; no scope expansion assumed',answer_availability='pending_structural_pair_reconciliation')
+  result.update(status='inventoried_from_pdf_bytes',page_count=len(pages),identity=identity,scanned_or_empty_pages=scanned,table_candidate_pages=table_candidates,text_sha256=sha(clean(text)),content_fingerprint=fingerprint(text,digest,len(scanned)>=len(pages)*.8),private_extraction_basis='Owner explicitly authorised this six-subject research task',publication_rights='Apply only an existing matching administrator rights declaration; no scope expansion assumed',answer_availability='pending_structural_pair_reconciliation')
   evidence=output/'evidence'/digest/'pages.json.gz';evidence.parent.mkdir(parents=True,exist_ok=True)
   with gzip.open(evidence,'wt',encoding='utf-8')as f:json.dump(pages,f,ensure_ascii=False)
   result['evidence_path']=str(evidence)

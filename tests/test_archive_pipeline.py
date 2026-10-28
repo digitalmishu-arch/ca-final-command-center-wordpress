@@ -8,6 +8,11 @@ import archive_profiles as profiles
 import gold_layout as gold
 from test_gold_layout import q,line
 class ArchivePipeline(unittest.TestCase):
+ def test_scanned_papers_do_not_share_a_blank_text_identity(self):
+  self.assertNotEqual(catalog.fingerprint('', 'TEST-PAPER-A', True),catalog.fingerprint('', 'TEST-PAPER-B', True));self.assertEqual(catalog.fingerprint('', 'TEST-SAME-BYTES', True),catalog.fingerprint('', 'TEST-SAME-BYTES', True))
+ def test_corrigendum_sign_and_decimal_changes_are_not_duplicates(self):
+  base='TEST independently authored source content with enough words for a meaningful document identity. Amount '
+  self.assertNotEqual(catalog.fingerprint(base+'100', 'a'),catalog.fingerprint(base+'-100', 'b'));self.assertNotEqual(catalog.fingerprint(base+'1.50', 'a'),catalog.fingerprint(base+'150', 'b'))
  def test_old_audit_title_precedes_incidental_reporting_words(self):
   f={'id':'TEST','title':'misleading-fr.pdf','subject':'AUDIT','folder_path':'AUDIT/RTP'}
   text='PAPER 3: ADVANCED AUDITING AND PROFESSIONAL ETHICS\nMAY 2021 EXAMINATION\nA case mentions financial reporting.'

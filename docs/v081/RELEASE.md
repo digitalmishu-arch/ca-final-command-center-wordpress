@@ -9,7 +9,7 @@ Based on exact PR #15 v0.8.0 commit `759052a8bbe058f08a5aac28cc47b8590de2915b`, 
 | Modern Light | Optional, same-content Explorer/My Practice/Dashboard preview. Current appearance remains the default. Both light/dark supported. |
 | Existing workflows | One-package import/publication, subjective/MCQ separation, lazy answers, entitlements, private activity and January IDs retained. |
 | Study Planner / Resources | Their implementation and assets are unchanged. No planner redesign. |
-| Source register | Actual bytes obtained for 535 PDFs: 526 main-directory files, eight supporting files and one source-link manifest. 12,790 PDF pages; 253,481,315 bytes. Nine normalized-content duplicate groups contain ten additional copies. These are source-copy relationships, not question-repeat claims. |
+| Source register | Actual bytes obtained for 535 PDFs: 526 main-directory files, eight supporting files and one source-link manifest. 12,790 PDF pages; 253,481,315 bytes. Eight native-text copy groups contain eight additional copies. One early blank-text group of three scanned papers was excluded and retained for separate OCR/manual review. Text matching never establishes image identity or question-repeat claims. |
 | Layout processing | Checkpointed per hash/engine/context. Source-specific IBS case numbering and short-adjacent-question heading regression added. Seven existing January source IDs/content-equivalent copies reserved. |
 | Academic completion | **Not a fully verified six-subject bank.** Unknown MTP targets/series, historical SFM/current-AFM mapping, image PDFs, exact answer parts, tables and historical taxonomy have explicit holds/warnings. Private coverage reports give actual draft/import counts. No academic approval or publication is supplied. |
 | OCR | Seven image-heavy PDFs, 186 pages, have separately hashed OCR review evidence. OCR figures/tables are not automatically publication eligible. |
@@ -20,7 +20,7 @@ Based on exact PR #15 v0.8.0 commit `759052a8bbe058f08a5aac28cc47b8590de2915b`, 
 
 ## Test evidence
 
-Local WordPress 6.8.3 / PHP 8.2.29: **961 legacy integration assertions**. Python: **112 authored regression tests**. Local Chromium tablet/phone tests cover reversible actions, comparison, lazy answers, two-student privacy, opt-in same-content appearance and unchanged Planner appearance. The exact v0.8→v0.8.1 upgrade fingerprint check retained rows across **62 prior tables**, including private activity. GitHub Actions reruns the public suites and installs WebKit; report its actual result separately rather than assuming it passed.
+Local WordPress 6.8.3 / PHP 8.2.29: **961 legacy integration assertions**. Python: **114 authored regression tests**. Local Chromium tablet/phone tests cover reversible actions, comparison, lazy answers, two-student privacy, opt-in same-content appearance and unchanged Planner appearance. The exact v0.8→v0.8.1 upgrade fingerprint check retained rows across **62 prior tables**, including private activity. GitHub Actions reruns the public suites and installs WebKit; report its actual result separately rather than assuming it passed.
 
 Real source-derived ZIP validation runs only in a private disposable WordPress installation. It performs preview, dependency-ordered draft import and checksum-identical reimport checks. Any deliberately tested publication in that installation is a **disposable software fixture**, not owner academic approval. No real data enters public test artifacts.
 
