@@ -40,7 +40,7 @@ with sync_playwright() as p:
  student.screenshot(path=str(ROOT/'docs/previews/v04-pending-phone.png'),full_page=True)
  admin.goto(BASE+'/wp-admin/admin.php?page=cafcc-access',wait_until='networkidle');row=admin.locator('#access-rows tr').filter(has_text=email);expect(row).to_contain_text('Email verified');row.get_by_role('button',name='Apply manual decision',exact=True).click();expect(admin.locator('#access-feedback')).to_contain_text('recorded')
  admin.set_viewport_size({'width':1024,'height':1366});admin.screenshot(path=str(ROOT/'docs/previews/v04-access-ipad.png'),full_page=True)
- student.goto(BASE+'/?cafcc_view=explorer',wait_until='networkidle');expect(student.locator('[data-cafcc-explorer]')).to_be_visible()
+ student.goto(BASE+'/?cafcc_view=explorer',wait_until='networkidle');expect(student.locator('[data-experience-explorer]')).to_be_visible()
  for view,text in [('resources','ICAI Resources'),('trends','January 2026 approved coverage'),('planner','Coming Soon'),('membership','Access is granted manually')]:
   student.goto(BASE+'/?cafcc_view='+view,wait_until='networkidle');expect(student.locator('body')).to_contain_text(text);assert student.evaluate('document.documentElement.scrollWidth<=innerWidth')
  assert not errors,errors;student_context.close();browser.close()
