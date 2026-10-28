@@ -6,7 +6,3 @@
 /* Explicit wrapping avoids WebKit treating adjacent performance buttons as one run. */
 .cc-mcq [data-mcq-metrics]{display:flex;flex-wrap:wrap;gap:.5rem}.cc-mcq [data-mcq-metrics]>:is(h2,h3,p){flex:1 1 100%;min-width:0;margin:.4rem 0}.cc-mcq [data-mcq-metrics]>button{flex:0 1 auto;min-width:0;max-width:100%;white-space:normal}.cc-portal .cc-mcq a{color:var(--cc-link);-webkit-text-fill-color:currentColor}
 
-/* WebKit leaks long native option captions into label/page scroll bounds.
-   Contain the replaced control, not the question or its accounting tables.
-   Native option menus retain their complete labels and selection behaviour. */
-.cc-mcq-filters select{contain:inline-size layout;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -56,3 +56,7 @@
 .cafcc-v2 .cc-answer-panel>.cc-meta{padding:10px 12px;border:1px solid var(--cc-border,#8398ad);border-radius:8px;background:var(--cc-panel,#fff)}
 /* Portal field labels use the theme ink, including MCQ and saved-practice forms. */
 .cc-portal :is(label,legend){color:var(--cc-ink)}
+
+/* WebKit must contain long native option captions within each single select.
+   The full native option menu remains available; rich question tables are unaffected. */
+.cc-portal select:not([multiple]){contain:inline-size layout;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
