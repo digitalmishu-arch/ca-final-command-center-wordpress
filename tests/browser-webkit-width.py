@@ -1,15 +1,21 @@
-"""Owned disposable WordPress only: investigate WebKit's root-vs-element width."""
-import json
+"""Original fixtures in disposable WordPress: native WebKit selects must not widen the page."""
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1]
 with sync_playwright() as p:
  b=p.webkit.launch();page=b.new_page(viewport={'width':1180,'height':820},has_touch=True,reduced_motion='reduce')
  page.goto('http://127.0.0.1:8092/wp-login.php',wait_until='networkidle');page.locator('#user_login').fill('student_a');page.locator('#user_pass').fill('cafcc-disposable-only');page.locator('#wp-submit').click();page.wait_for_load_state('networkidle')
  page.goto('http://127.0.0.1:8092/?cafcc_view=mcq',wait_until='networkidle');page.locator('[data-mcq-list] button').first.click();page.locator('[name=mcq-option][value=B]').check();page.get_by_role('button',name='Check Answer',exact=True).click();page.wait_for_function("document.querySelector('[data-mcq-feedback]').textContent.length>0")
- page.set_viewport_size({'width':390,'height':844});page.wait_for_timeout(300)
- def dimensions():return page.evaluate('''()=>{const box=n=>{const r=n.getBoundingClientRect(),s=getComputedStyle(n);return {tag:n.tagName,cls:n.className,id:n.id,left:r.left,right:r.right,width:r.width,scroll:n.scrollWidth,client:n.clientWidth,overflow:s.overflow,position:s.position,padding:s.padding,margin:s.margin,min:s.minWidth,display:s.display,text:n.textContent.slice(0,65)}};return {viewport:innerWidth,scrollX,visual:visualViewport.width,root:box(document.documentElement),body:box(document.body),portal:box(document.querySelector('.cc-portal')),overflow:[...document.querySelectorAll('*')].filter(n=>{const r=n.getBoundingClientRect();return r.width&&(r.right+scrollX>innerWidth+1||r.left+scrollX<0||n.scrollWidth>n.clientWidth+2)}).map(box).slice(0,50)}}''')
- report={'original':dimensions()};page.screenshot(path=str(ROOT/'docs/previews/v07-webkit-width-original.png'),full_page=True)
- for name,script in [('zero_scroll','scrollTo(0,scrollY)'),('body_flow_root',"document.body.style.display='flow-root'"),('body_width',"document.body.style.width='100%'"),('portal_layout',"document.querySelector('.cc-portal').style.contain='layout'"),('native_controls',"document.querySelectorAll('select,input').forEach(n=>n.style.webkitAppearance='none')"),('filter_containment',"document.querySelector('.cc-mcq-filters').style.overflow='clip'")]:
-  page.evaluate(script);page.wait_for_timeout(150);report[name]=dimensions()
- page.reload(wait_until='networkidle');report['fresh_phone']=dimensions();print(json.dumps(report));b.close()
+ for width,height,label in [(390,844,'phone'),(820,1180,'portrait'),(1180,820,'landscape')]:
+  page.set_viewport_size({'width':width,'height':height})
+  for theme in ['light','dark']:
+   if page.locator('.cc-portal').get_attribute('data-cc-theme')!=theme:page.locator('.cc-theme-toggle').click()
+   page.wait_for_function('document.documentElement.scrollWidth<=innerWidth')
+   sizes=page.locator('.cc-mcq-filters').evaluate('f=>({width:f.clientWidth,scroll:f.scrollWidth,labels:[...f.querySelectorAll("label")].map(n=>({width:n.clientWidth,scroll:n.scrollWidth}))})')
+   assert sizes['scroll']<=sizes['width']+1,sizes
+   assert all(x['scroll']<=x['width']+1 for x in sizes['labels']),sizes
+   page.screenshot(path=str(ROOT/f'docs/previews/v07-webkit-focused-{theme}-{label}.png'),full_page=True,animations='disabled')
+ # The same native select still carries the full title and filters actual assigned tags.
+ control=page.locator('[name=standard]');expect(control.locator('option[value="Ind AS 105"]')).to_contain_text('Non-current Assets');control.select_option('Ind AS 105');expect(page.locator('[data-mcq-list] .cc-mcq-result')).to_have_count(1)
+ page.set_viewport_size({'width':390,'height':844});page.wait_for_function('document.documentElement.scrollWidth<=innerWidth');b.close()
+print('PASS focused WebKit native filters: no page/label overflow in both themes and phone/tablet orientations; full option labels and actual standards filtering retained. No physical Safari claim.')
