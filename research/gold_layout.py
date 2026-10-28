@@ -185,12 +185,16 @@ def borderless_tables(selected,used):
     return models
 
 
-def reconstruct(q,document):
+def reconstruct(q,document,table_cache=None):
     lines=q['lines'];blocks=[];warnings=[];used=set()
     for pn in sorted({l['page'] for l in lines}):
         selected=[(i,l) for i,l in enumerate(lines) if l['page']==pn];page=document[pn-1]
         start=q.get('start',{});end=q.get('end_exclusive',{});top=start.get('bbox',[0,0,0,0])[1]-2 if start.get('page')==pn else 0;bottom=end.get('bbox',[0,page.rect.height,0,0])[1] if end.get('page')==pn else page.rect.height;region=[0,top,page.rect.width,bottom]
-        try:tables=page.find_tables(strategy='lines_strict').tables
+        try:
+            if table_cache is not None and pn in table_cache:tables=table_cache[pn]
+            else:
+                tables=page.find_tables(strategy='lines_strict').tables
+                if table_cache is not None:table_cache[pn]=tables
         except Exception:tables=[];warnings.append('table_detection_failed_page_'+str(pn))
         for t in tables:
             if not fitz.Rect(region).intersects(t.bbox):continue

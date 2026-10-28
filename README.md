@@ -1,3 +1,11 @@
+# Version 0.8.1 — private revision-library refinements and archive tooling
+
+Based on reviewed v0.8 PR #15. Adds reversible personal-list actions, completed-attempt comparisons and opt-in Modern Light appearance. Study Planner and ICAI Resources remain unchanged. The existing one-package publication workflow is retained.
+
+The six-subject research pipeline and actual academic data have separate coverage reports. Parsing is not academic verification. Private PDFs, workbooks and derived content never enter the plugin ZIP, public repository or public Actions artifacts.
+
+See [v0.8.1 guide](docs/v081/IPAD.md) and [release status](docs/v081/RELEASE.md).
+
 # Version 0.8.0 — compact study portal and private planner
 
 Continue from PR14/v0.7. The existing academic ZIP publication workflow, question identities and private activity remain intact. No Hostinger access or deployment is part of this release.
