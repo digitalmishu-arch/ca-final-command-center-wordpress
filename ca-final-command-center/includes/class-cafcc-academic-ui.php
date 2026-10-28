@@ -81,14 +81,20 @@ final class CAFCC_Academic_UI {
 
     private static function assets($admin=false) {
         wp_enqueue_style('cafcc-v2',plugins_url('assets/explorer.css',CAFCC_FILE),array(),CAFCC_VERSION);
+        if(!$admin)wp_enqueue_script('cafcc-net',plugins_url('assets/net.js',CAFCC_FILE),array(),CAFCC_VERSION,true);
         $handle=$admin?'cafcc-manager':'cafcc-explorer';
-        wp_enqueue_script($handle,plugins_url('assets/'.($admin?'manager.js':'explorer.js'),CAFCC_FILE),array(),CAFCC_VERSION,true);
+        wp_enqueue_script($handle,plugins_url('assets/'.($admin?'manager.js':'explorer.js'),CAFCC_FILE),$admin?array():array('cafcc-net'),CAFCC_VERSION,true);
         $config=array('url'=>esc_url_raw(rest_url($admin?'cafcc/v2/':'cafcc/v4/')),'v1'=>esc_url_raw(rest_url('cafcc/v1/')),'practice'=>esc_url_raw(rest_url('cafcc/v3/')),'library'=>esc_url_raw(rest_url('cafcc/v9/')),'nonce'=>wp_create_nonce('wp_rest'));
+        $config['notes']=rest_url('cafcc/v10/');
         if($admin){$config['definitions']=CAFCC_Academic::definitions();$config['templates']=CAFCC_Import::templates();}
         wp_localize_script($handle,$admin?'CAFCCManager':'CAFCCExplorer',$config);
     }
 
     public static function student($view='explorer') {
+        if($view!=='reader')return $view==='practice'?CAFCC_Library::screen():CAFCC_Experience::screen();
+        return self::legacy_student($view);
+    }
+    private static function legacy_student($view='explorer') {
         if (!is_user_logged_in() || !current_user_can('read')) {return '<div class="cafcc"><p>Please <a href="'.esc_url(wp_login_url(get_permalink())).'">sign in</a> to access your CA Final dashboard.</p></div>';}
         self::assets();CAFCC_Study::assets();ob_start(); ?>
         <section class="cafcc-v2" data-cafcc-explorer <?php if($view==='reader')echo 'data-reader-only'; ?> data-view="<?php echo $view==='practice'?'practice':'explorer'; ?>" aria-label="CA Final Command Center">
