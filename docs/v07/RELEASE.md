@@ -28,7 +28,7 @@ The five existing r016 Answer Pending records and previous classification/format
 
 ## Validation scope
 
-- Fresh WordPress: **844 integration assertions**. Legacy/prototype mode: **848 assertions**. WordPress 6.8.3 / PHP 8.2.29 / disposable MariaDB.
+- Fresh WordPress: **849 integration assertions**. Legacy/prototype mode: **853 assertions**. WordPress 6.8.3 / PHP 8.2.29 / disposable MariaDB.
 - **98 offline research tests**, using authored content/geometry fixtures.
 - Actual 0.6.0/schema 8 → 0.7.0/schema 9 upgrade compared retained question, source, rights, account, note, progress and timer rows byte-for-byte.
 - Private source-derived tests exercised real r016/MCQs, exact Drive citations, all four MCQ categories, hidden keys, replay-safe scoring/tests and two-student privacy. The real MCQ ZIP passed owner UI preview and one confirmation: 55 selected, 54 eligible, one held.
