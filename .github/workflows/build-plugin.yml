@@ -69,5 +69,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Upgrade v0.7 and fingerprint every existing academic/student table
-        run: bash tests/run-upgrade-v08.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install authored-baseline browser tools on CI only
+        run: |
+          python3 -m pip install playwright==1.56.0
+          python3 -m playwright install --with-deps chromium
+      - name: Capture v0.7 baseline and fingerprint every existing academic/student table
+        run: CAFCC_CAPTURE_BASELINE=1 bash tests/run-upgrade-v08.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v080-upgrade-before-previews
+          path: docs/previews/v08-before-*.png
+          if-no-files-found: error
+          retention-days: 30

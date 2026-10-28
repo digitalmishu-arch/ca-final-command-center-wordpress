@@ -19,6 +19,13 @@ cleanup(){
 trap cleanup EXIT
 CAFCC_PREVIEW=1 bash tests/run-integration.sh
 read -r upgrade_wp <work/preview-containers.txt
+if [[ "${CAFCC_CAPTURE_BASELINE:-0}" == 1 ]]; then
+ docker exec "$upgrade_wp" php /repo/tests/v06-browser-fixtures.php
+ docker cp "$release_root/tests/v08-before-prepare.php" "$upgrade_wp:/tmp/v08-before-prepare.php"
+ docker exec "$upgrade_wp" php /tmp/v08-before-prepare.php
+ docker exec "$upgrade_wp" php /repo/tests/v07-browser-fixtures.php
+ python3 "$release_root/tests/capture-v08-before.py"
+fi
 docker cp "$release_root/tests/upgrade-v08.php" "$upgrade_wp:/tmp/upgrade-v08.php"
 docker exec -e CAFCC_UPGRADE_MODE=snapshot "$upgrade_wp" php /tmp/upgrade-v08.php
 docker cp "$release_root/ca-final-command-center/." "$upgrade_wp:/var/www/html/wp-content/plugins/ca-final-command-center/"
