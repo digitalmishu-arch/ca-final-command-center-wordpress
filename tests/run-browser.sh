@@ -23,4 +23,5 @@ CAFCC_ADMIN_ONLY=1 python3 tests/browser-v051.py
 CAFCC_ADMIN_ONLY=1 python3 tests/browser-v052.py
 CAFCC_ADMIN_ONLY=1 python3 tests/browser-v06.py
 python3 tests/browser-v08.py
-if [[ "${CAFCC_TEST_WEBKIT:-0}" == 1 ]]; then CAFCC_BROWSER_ENGINE=webkit python3 tests/browser-v08.py; fi
+python3 tests/browser-v081.py
+if [[ "${CAFCC_TEST_WEBKIT:-0}" == 1 ]]; then CAFCC_BROWSER_ENGINE=webkit python3 tests/browser-v08.py; CAFCC_BROWSER_ENGINE=webkit python3 tests/browser-v081.py; fi

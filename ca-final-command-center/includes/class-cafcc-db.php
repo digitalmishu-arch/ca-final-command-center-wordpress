@@ -2,7 +2,7 @@
 defined('ABSPATH') || exit;
 
 final class CAFCC_DB {
-    const VERSION = '10';
+    const VERSION = '11';
 
     public static function table($entity) {
         global $wpdb;
@@ -49,6 +49,12 @@ final class CAFCC_DB {
         // Refuse to run an older plugin against a newer database.
         if ((int) $version > (int) self::VERSION) {
             return new WP_Error('cafcc_schema', 'The academic database requires a newer plugin version.');
+        }
+        if ($version === '10') {
+            $result=CAFCC_Saved::migrate();
+            if(is_wp_error($result))return $result;
+            update_option('cafcc_db_version',self::VERSION,false);
+            return true;
         }
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         $charset = $wpdb->get_charset_collate();
@@ -136,6 +142,7 @@ final class CAFCC_DB {
         $links=CAFCC_Public_Sources::migrate();if(is_wp_error($links))return $links;
         $planner=CAFCC_Planner::migrate();if(is_wp_error($planner))return $planner;
         $resources=CAFCC_Resource_Matrix::migrate();if(is_wp_error($resources))return $resources;
+        $saved=CAFCC_Saved::migrate();if(is_wp_error($saved))return $saved;
         update_option('cafcc_db_version', self::VERSION, false);
         return true;
     }

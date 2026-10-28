@@ -134,7 +134,7 @@ final class CAFCC_Academic {
                 if ('month'===$type && ''!==$value && !preg_match('/^[12][0-9]{3}-(0[1-9]|1[0-2])$/D',$value)) { return CAFCC_Repository::error('Edition dates must be YYYY-MM or blank when unknown.'); }
             }
             if (is_wp_error($value)) { return $value; }
-            if(is_string($value)&&class_exists('CAFCC_Bank_DB')&&CAFCC_Bank_DB::private_reference($value))return CAFCC_Repository::error('Private Drive references must remain outside public academic records.');
+            if(is_string($value)&&class_exists('CAFCC_Bank_DB')&&CAFCC_Bank_DB::private_reference($value)&&!($key==='official_url'&&in_array($kind,array('documents','answers'),true)&&CAFCC_Sources::confirmed_public_copy($value)))return CAFCC_Repository::error('Private Drive references must remain outside public academic records.');
             $data[$key]=$value;
         }
         if (isset($data['publication_status']) && 'published'===$data['publication_status'] && 'verified'!==$data['review_status']) { return CAFCC_Repository::error('Publication requires verification.'); }

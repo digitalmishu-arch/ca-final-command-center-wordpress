@@ -177,7 +177,7 @@ final class CAFCC_Repository {
                 return self::error('This record has dependent records. Create a separate record for structural changes.', 409);
             }
         }
-        foreach($data as $value)if(is_string($value)&&class_exists('CAFCC_Bank_DB')&&CAFCC_Bank_DB::private_reference($value))return self::error('Private Drive references are not public academic records.');
+        foreach($data as $field=>$value)if(is_string($value)&&class_exists('CAFCC_Bank_DB')&&CAFCC_Bank_DB::private_reference($value)&&!($entity==='documents'&&$field==='official_url'&&CAFCC_Sources::confirmed_public_copy($value)))return self::error('Private Drive references are not public academic records.');
         $table = CAFCC_DB::table($entity);
         $result = $id ? $wpdb->update($table, $data, array('id' => $id)) : $wpdb->insert($table, $data);
         if (false === $result) {
