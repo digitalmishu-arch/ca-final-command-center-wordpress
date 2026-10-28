@@ -48,4 +48,17 @@ class IBSProfiles(unittest.TestCase):
    for y,t in [(80,'CASE STUDY - 1'),(110,'TEST common facts belonging to this independently authored case.'),(160,'Multiple Choice Questions'),(190,'1.1 TEST choose one option.'),(220,'(a) TEST first'),(245,'(b) TEST second'),(270,'(c) TEST third'),(295,'(d) TEST fourth'),(330,'Descriptive Questions'),(360,'1.6 TEST calculate the required amount.'),(410,'ANSWERS'),(440,'1.1 Option (B): TEST key'),(480,'1.6 TEST complete working and explanation.')]:p.insert_text((72,y),t)
    records,profile=ibs_layout.discover(d,{'source_type':'exam','role':'questions_and_answers'});self.assertEqual([(q['side'],q['reference'],q['format'])for q in records],[('question','1.1','MCQ'),('question','1.6','SUBJECTIVE'),('answer','1.1','MCQ'),('answer','1.6','SUBJECTIVE')]);self.assertIn('TEST common facts',' '.join(l['text']for l in records[1]['shared_lines']));self.assertEqual(records[1]['parent_reference'],'1')
 
+
+class StructuralIntegrity(unittest.TestCase):
+ def model(self,cells):return {'blocks':[{'type':'table','page':2,'bbox':[1,2,300,200],'cells':cells}]}
+ def test_placeholder_cannot_move_into_label(self):
+  import archive_integrity as a
+  rich=self.model([dict(row=0,column=0,text='TEST liability -'),dict(row=0,column=1,text='40'),dict(row=0,column=2,text='')]);self.assertEqual(a.inspect(rich)[0]['code'],'amount_placeholder_column_assignment_requires_review')
+ def test_formula_font_glyph_requires_correction(self):
+  import archive_integrity as a
+  self.assertEqual(a.inspect(self.model([dict(row=0,column=0,text='TEST formula \ue010 12')]))[0]['code'],'unsupported_pdf_formula_or_font_glyph')
+ def test_tokens_do_not_prove_multiline_row_association(self):
+  import archive_integrity as a
+  rich=self.model([dict(row=0,column=0,text='TEST labels'),dict(row=0,column=1,text='100\n200\n300')]);self.assertEqual(a.inspect(rich)[0]['code'],'multi_amount_cell_row_associations_require_review');rich['blocks'][0]['row_method']='printed_numeric_baselines';self.assertEqual(a.inspect(rich),[])
+
 if __name__=='__main__':unittest.main()

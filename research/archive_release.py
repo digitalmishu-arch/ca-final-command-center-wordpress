@@ -17,6 +17,7 @@ import layout_engine
 import fr_package
 import mcq_pipeline
 import ibs_mcq
+import archive_integrity
 ROOT=Path(__file__).resolve().parents[1]
 SUBJECTS=('FR','AFM','AUDIT','DT','IDT','IBS')
 PRIOR_LEDGER_PATH=ROOT/'work/january-complete/extraction-r016/prior-owner-corrections.json'
@@ -149,7 +150,7 @@ def build(manifest_path,worker_path,out,revision):
       if len(exact)==1:record['ai_proposal']['primary_path']=[exact[0]];record['ai_proposal']['official_nodes']=[exact[0]]
       if any(x['import_record']['stable_id']==stable for x in rows):
        exceptions.append(dict(file_id=r['file_id'],code='duplicate_boundary_candidate_identity',required_action='Q'+child['reference']+' '+subref(child)+' PDF '+page(child)+' has another detected boundary with the same identity; inspect the saved layout profile.'));continue
-      row=dict(import_record=record,question=review_rich,answer=arich,import_eligible=eligible,bundle=bundle,source_file_id=r['file_id']);rows.append(row)
+      row=dict(import_record=record,question=review_rich,answer=arich,import_eligible=eligible,bundle=bundle,source_file_id=r['file_id']);archive_integrity.hold(row);rows.append(row)
       detail=base/'details'/(stable+'.html');detail.parent.mkdir(exist_ok=True);detail.write_text('<!doctype html><meta charset="utf-8"><title>Private Needs Review</title><style>body{font:17px system-ui;max-width:1100px;margin:24px auto}table{border-collapse:collapse}td,th{border:1px solid #889;padding:8px}</style><h1>Needs Review — '+stable+'</h1><p>'+html.escape(r['filename']+' · '+d['exam_attempt']+' · Q'+child['reference']+subref(child)+' · PDF '+page(child))+'</p><h2>Shared facts</h2>'+(scenarios.get(record['practice_structure'].get('scenario_key'),{}).get('body_html',''))+'<h2>Question</h2>'+rich['body_html']+'<h2>Provisional answer candidate</h2>'+(arich['body_html']if arich else'<p>Answer Pending</p>')+'<pre>'+html.escape(json.dumps(warnings,indent=2))+'</pre>')
       for kind,body in [('question',rich),('answer',arich)]:
        if body:
