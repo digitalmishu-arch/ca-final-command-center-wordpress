@@ -124,6 +124,7 @@ def extract_group(group):
         scenario=next((c for c in case_data if c['range']and c['range'][0]<=int(q['reference'])<=c['range'][1]),None)
         # A case is linked only when its source says which question range it covers.
         if not scenario and any(position(c['start'])<position(start)and not c['range']for c in case_data):warnings.append('common_facts_question_range_requires_review')
+        warnings += [e['code']for e in key_errors if e.get('reference')==q['reference']]
         key=keys.get(q['reference']);key_policy='single'if key and len(key['correct_options'])==1 else'needs_owner_decision'
         if not key:warnings.append('matching_explicit_answer_key_missing')
         elif key_policy!='single':warnings.append('multiple_key_options_selection_policy_requires_owner_decision')

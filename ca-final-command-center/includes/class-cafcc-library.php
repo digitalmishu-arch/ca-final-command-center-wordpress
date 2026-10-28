@@ -7,7 +7,7 @@ final class CAFCC_Library {
     public static function allowed(){return CAFCC_Access::eligible() ? true : CAFCC_Repository::error('Current student access is required.',403);}
     public static function filters($request){
         $f=array();
-        foreach(array('tab'=>'all','search'=>'','subject'=>'','source'=>'','attempt'=>'','series'=>'','date'=>'','session_status'=>'','sort'=>'recent','direction'=>'desc') as $key=>$default){
+        foreach(array('tab'=>'all','search'=>'','subject'=>'','source'=>'','attempt'=>'','series'=>'','date'=>'','session_status'=>'','topic_id'=>'','sort'=>'recent','direction'=>'desc') as $key=>$default){
             $v=$request->get_param($key)??$default;
             if(!is_string($v)||strlen($v)>190)return CAFCC_Repository::error('Invalid practice filter.');
             $f[$key]=sanitize_text_field($v);
@@ -18,6 +18,7 @@ final class CAFCC_Library {
         if($f['series']&&!in_array($f['series'],array('I','II'),true))return CAFCC_Repository::error('Choose an MTP series.');
         if(!in_array($f['session_status'],array('','running','paused','finished'),true))return CAFCC_Repository::error('Invalid session status.');
         if($f['date']&&$f['date']!=='today'&&!preg_match('/^\d{4}-\d{2}-\d{2}$/D',$f['date']))return CAFCC_Repository::error('Use a date in YYYY-MM-DD format.');
+        if($f['topic_id']&&(!preg_match('/^[1-9][0-9]{0,17}$/D',$f['topic_id'])||!CAFCC_Academic::path_published((int)$f['topic_id'])))return CAFCC_Repository::error('This topic is unavailable.');
         $page=$request->get_param('page')??1;if(!is_scalar($page)||!preg_match('/^[1-9][0-9]{0,5}$/D',(string)$page))return CAFCC_Repository::error('Invalid page.');$f['page']=(int)$page;
         return $f;
     }
@@ -50,6 +51,7 @@ final class CAFCC_Library {
             case 'highlighted':$where.=" AND EXISTS(SELECT 1 FROM $hi h WHERE h.user_id=$uid AND h.occurrence_id=occ.id)";break;
         }
         foreach(array('subject'=>'subject.code','source'=>'doc.source_type','attempt'=>'doc.exam_attempt','series'=>'meta.mtp_series') as $filter=>$col)if($f[$filter]){$where.=" AND $col=%s";$args[]=$f[$filter];}
+        if($f['topic_id']){$where.=' AND EXISTS(SELECT 1 FROM '.CAFCC_DB::table('question_tags').' tmap JOIN '.CAFCC_Bank_DB::table('closure').' tpath ON tpath.descendant_id=tmap.node_id WHERE tmap.question_id=q.id AND tpath.ancestor_id=%d)';$args[]=(int)$f['topic_id'];}
         if($f['search']){$term='%'.$wpdb->esc_like($f['search']).'%';$where.=" AND (qm.stable_key LIKE %s OR q.question_number LIKE %s OR notebook.note_text LIKE %s OR personal.tags_json LIKE %s OR q.title LIKE %s)";array_push($args,$term,$term,$term,$term,$term);}
         if($f['session_status']){$where.=' AND session.status=%s';$args[]=$f['session_status'];}
         $bounds=self::date_bounds($f['date']);if($bounds===false)return CAFCC_Repository::error('Invalid calendar date.');if($bounds){$where.=' AND session.started_at>=%d AND session.started_at<%d';array_push($args,...$bounds);}
@@ -105,9 +107,12 @@ final class CAFCC_Library {
             if($mode==='finished'){$cards[]=array('key'=>'finished_sessions','label'=>'Finished Timer Sessions','value'=>(int)$stats['sessions'],'url'=>self::practice_url($f));$cards[]=array('key'=>'average_time','label'=>'Average Finished Session Time','value'=>(int)round($stats['average_seconds']),'format'=>'duration','url'=>self::practice_url($f));}
         }
         $recent_request=clone $request;$recent_request->set_param('tab','timed');$recent=self::list($recent_request);
-        return array('cards'=>$cards,'recent_sessions'=>is_wp_error($recent)?array():array_slice($recent['items'],0,5),'mcq'=>class_exists('CAFCC_MCQ_Student')?CAFCC_MCQ_Student::metrics():null,'note'=>'Subjective results are your own assessment. MCQ correctness is scored separately. Counts include retained private activity; withdrawn academic text is never returned.');
+        $_activity=self::activity($request);return array('activity'=>$_activity,'cards'=>$cards,'recent_sessions'=>is_wp_error($recent)?array():array_slice($recent['items'],0,5),'mcq'=>class_exists('CAFCC_MCQ_Student')?CAFCC_MCQ_Student::metrics():null,'note'=>'Subjective results are your own assessment. MCQ correctness is scored separately. Counts include retained private activity; withdrawn academic text is never returned.');
     }
-    public static function practice_url($f){$args=array('cafcc_view'=>'practice');foreach(array('tab','subject','source','attempt','series','date','session_status') as $k)if(!empty($f[$k]))$args[$k]=$f[$k];return add_query_arg($args,home_url('/'));}
+    public static function activity($request){
+        global $wpdb;$r=clone $request;$r->set_param('tab','timed');$r->set_param('session_status','finished');$f=self::filters($r);if(is_wp_error($f))return array();[$from,$w,$a]=self::query($f);$sources=$wpdb->get_results(self::prepare("SELECT doc.source_type,meta.mtp_series,COUNT(session.id) AS sessions,COUNT(DISTINCT q.id) AS questions,SUM(session.active_seconds) AS seconds $from WHERE $w GROUP BY doc.source_type,meta.mtp_series",$a),ARRAY_A);foreach($sources as &$source){$sf=$f;$sf['source']=$source['source_type'];$sf['series']=$source['mtp_series'];$source['url']=self::practice_url($sf);$source['label']=self::source_label($source['source_type'],$source['mtp_series']);}unset($source);$tags=CAFCC_DB::table('question_tags');$tax=CAFCC_DB::table('taxonomy');$topics=$wpdb->get_results(self::prepare("SELECT topic.id,topic.title,COUNT(DISTINCT session.id) AS sessions,COUNT(DISTINCT q.id) AS questions,SUM(session.active_seconds) AS seconds $from JOIN $tags activity_tag ON activity_tag.question_id=q.id JOIN $tax topic ON topic.id=activity_tag.node_id WHERE $w AND topic.node_type IN ('topic','subtopic') GROUP BY topic.id,topic.title ORDER BY seconds DESC LIMIT 30",$a),ARRAY_A);$public=array();foreach($topics as $topic)if(CAFCC_Academic::path_published($topic['id'])){$tf=$f;$tf['topic_id']=(string)$topic['id'];$topic['url']=self::practice_url($tf);$public[]=$topic;}return array('sources'=>$sources,'topics'=>$public,'note'=>'Finished sessions only. Multiple topic tags can describe the same session; topic rows are not additive and do not measure mastery.');
+    }
+    public static function practice_url($f){$args=array('cafcc_view'=>'practice');foreach(array('tab','subject','source','attempt','series','date','session_status','topic_id') as $k)if(!empty($f[$k]))$args[$k]=$f[$k];return add_query_arg($args,home_url('/'));}
     public static function assets(){
         wp_enqueue_style('cafcc-library',plugins_url('assets/library.css',CAFCC_FILE),array('cafcc-study'),CAFCC_VERSION);
         wp_enqueue_script('cafcc-library',plugins_url('assets/library.js',CAFCC_FILE),array('cafcc-study'),CAFCC_VERSION,true);

@@ -21,7 +21,7 @@ final class CAFCC_Public_Sources {
         ) ENGINE=InnoDB ".$wpdb->get_charset_collate().';');
         $file=dirname(__DIR__).'/data/january2026-public-sources.json';$rows=json_decode(file_get_contents($file),true);
         foreach($rows['sources'] as $row){$old=$wpdb->get_var($wpdb->prepare("SELECT id FROM $t WHERE source_hash=%s AND source_role=%s",$row['sha256'],$row['role']));if($old)continue;
-            $ok=$wpdb->insert($t,array('source_hash'=>$row['sha256'],'source_role'=>$row['role'],'drive_file_id'=>$row['drive_file_id'],'title'=>$row['title'],'state'=>'active','evidence_json'=>wp_json_encode(array('owner_authorised_public_source_copy'=>true,'public_reader_metadata_checked'=>true,'actual_pdf_bytes_checked'=>true,'checked_on'=>$rows['checked_on'],'original_exam_paper_claim'=>false,'page_jump_supported'=>false)),'reviewer_id'=>get_current_user_id(),'checked_at'=>current_time('mysql',true)));if(false===$ok)return CAFCC_Repository::error('Public source-link migration incomplete.',503);
+            $ok=$wpdb->insert($t,array('source_hash'=>$row['sha256'],'source_role'=>$row['role'],'drive_file_id'=>$row['drive_file_id'],'title'=>$row['title'],'state'=>'active','evidence_json'=>wp_json_encode(array('owner_authorised_public_source_copy'=>true,'public_reader_metadata_checked'=>true,'actual_pdf_bytes_checked'=>true,'checked_on'=>$rows['checked_on'],'original_exam_paper_claim'=>false,'page_jump_supported'=>false)),'reviewer_id'=>0,'checked_at'=>current_time('mysql',true)));if(false===$ok)return CAFCC_Repository::error('Public source-link migration incomplete.',503);
         }return true;
     }
     public static function find($hash,$kind){

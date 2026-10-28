@@ -180,7 +180,7 @@
             ['chapter_id','unit_id','topic_id','subtopic_id'].forEach(k => { fields[k].value = ''; });
             item.ancestors.forEach(a => { const f = fields[a.type + '_id']; if (f) { if (![...f.options].some(o => o.value === String(a.id))) f.append(option(a.id, a.title)); f.value = a.id; } });
             root.querySelector('.cc-selected-path').textContent = item.subject_code + ' · ' + item.edition_title + ' → ' + item.ancestors.map(a => a.title).join(' → ');
-            root.querySelector('.cc-concept-results').replaceChildren(); root.querySelector('.cc-concept-input').setAttribute('aria-expanded','false'); page = 1; refresh();
+            root.querySelector('#cc-concept-results').replaceChildren(); root.querySelector('.cc-concept-input').setAttribute('aria-expanded','false'); page = 1; refresh();
         }
         chain.forEach(key => fields[key].addEventListener('change', () => {
             if (['subject_id','edition_id'].includes(key)) {
@@ -189,7 +189,7 @@
             page = 1; refresh();
         }));
         let conceptTimer, conceptGeneration = 0;
-        const input = root.querySelector('.cc-concept-input'), results = root.querySelector('.cc-concept-results');
+        const input = root.querySelector('.cc-concept-input'), results = root.querySelector('#cc-concept-results');
         input.addEventListener('input', () => { clearTimeout(conceptTimer); const generation = ++conceptGeneration; conceptTimer = setTimeout(async () => {
             results.replaceChildren(); if (input.value.trim().length < 2) { input.setAttribute('aria-expanded','false'); return; }
             try { const result = await api('concepts?scope='+scope+'&term=' + encodeURIComponent(input.value.trim())); if (generation !== conceptGeneration) return;
