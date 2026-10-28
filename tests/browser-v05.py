@@ -27,4 +27,4 @@ with sync_playwright() as p:
     student.goto(BASE+'/?cafcc_view=mcq',wait_until='networkidle');expect(student.locator('[data-mcq]')).to_be_visible();assert not student.locator('.cc-question').count()
     admin.goto(BASE+'/wp-admin/admin.php?page=cafcc-rights',wait_until='networkidle');admin.get_by_role('button',name='New permission',exact=True).click();expect(admin.locator('#rights-form')).to_contain_text('Permission reference (optional for physical attestation)');admin.screenshot(path=str(ROOT/'docs/previews/v05-private-rights-ipad.png'),full_page=True)
     browser.close()
-print('V0.5 original-fixture browser passed: full question/answer owner preview, three decisions, immediate publication, no answer prefetch, deliberate Show/Hide Answer, private rights interface and MCQ Coming Soon.')
+print('V0.5 original-fixture browser passed: full question/answer owner preview, three decisions, immediate publication, no answer prefetch, deliberate Show/Hide Answer, private rights interface and a separate MCQ destination.')
