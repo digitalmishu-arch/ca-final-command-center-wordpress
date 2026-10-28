@@ -54,3 +54,5 @@
 .cafcc-v2 .cc-rich-content mark,.cafcc-v2 mark[data-study-highlight]{background:#ffe195!important;color:#17283e!important;-webkit-text-fill-color:#17283e!important;box-shadow:0 0 0 1px #d7a530;opacity:1}
 .cafcc-v2 .cc-answer-panel :is(h3,h4,h5){color:var(--cc-ink,#14263f)}
 .cafcc-v2 .cc-answer-panel>.cc-meta{padding:10px 12px;border:1px solid var(--cc-border,#8398ad);border-radius:8px;background:var(--cc-panel,#fff)}
+/* Portal field labels use the theme ink, including MCQ and saved-practice forms. */
+.cc-portal :is(label,legend){color:var(--cc-ink)}

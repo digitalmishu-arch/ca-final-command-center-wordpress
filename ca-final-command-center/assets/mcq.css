@@ -3,3 +3,5 @@
 .cc-mcq .cc-library-scroll{max-width:100%;overflow-x:auto;border:1px solid var(--cc-border);border-radius:12px;-webkit-overflow-scrolling:touch}.cc-mcq .cc-library-table{width:100%;min-width:650px;border-collapse:collapse;font-size:.86rem;text-align:left}.cc-mcq .cc-library-table th{white-space:nowrap}.cc-mcq [data-mcq-activity]{max-width:100%;min-width:0;margin:1rem 0;scroll-margin-top:1rem}.cc-mcq .cc-library-table td{vertical-align:top}
 /* Native WebKit controls must be allowed to shrink inside narrow grid tracks. */
 .cc-mcq,.cc-mcq-filters>*{min-width:0}.cc-mcq :is(select,input){min-width:0;max-width:100%}@media(max-width:600px){.cc-mcq-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Explicit wrapping avoids WebKit treating adjacent performance buttons as one run. */
+.cc-mcq [data-mcq-metrics]{display:flex;flex-wrap:wrap;gap:.5rem}.cc-mcq [data-mcq-metrics]>:is(h2,h3,p){flex:1 1 100%;min-width:0;margin:.4rem 0}.cc-mcq [data-mcq-metrics]>button{flex:0 1 auto;min-width:0;max-width:100%;white-space:normal}.cc-portal .cc-mcq a{color:var(--cc-link);-webkit-text-fill-color:currentColor}
