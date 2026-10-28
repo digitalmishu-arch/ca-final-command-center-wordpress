@@ -6,14 +6,11 @@
     const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
     const option = (value, label) => { const n = node('option', label); n.value = value; return n; };
     async function api(path, body, v1 = false, practice = false) {
-        const v9=path.startsWith('v9/');if(v9)path=path.slice(3);
+        const v10=path.startsWith('v10/'),v9=path.startsWith('v9/');if(v9)path=path.slice(3);if(v10)path=path.slice(4);
         const [route, query = ''] = path.split('?');
-        const target = new URL((v9?CAFCCExplorer.library:practice ? CAFCCExplorer.practice : v1 ? CAFCCExplorer.v1 : CAFCCExplorer.url) + route);
+        const target = new URL((v10?CAFCCExplorer.notes:v9?CAFCCExplorer.library:practice ? CAFCCExplorer.practice : v1 ? CAFCCExplorer.v1 : CAFCCExplorer.url) + route);
         new URLSearchParams(query).forEach((value, key) => target.searchParams.set(key, value));
-        const response = await fetch(target, {method: body ? 'PUT' : 'GET', credentials: 'same-origin', cache: 'no-store', headers: {'X-WP-Nonce': CAFCCExplorer.nonce, 'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'The request failed. Reload and try again.');
-        return data;
+        return CAFCCNet.request(target,{method:body?'PUT':'GET',body,nonce:CAFCCExplorer.nonce});
     }
     function link(url, label, verifiedMirror = false, ownerPublic = false) {
         const u = new URL(url);
@@ -60,10 +57,10 @@
                 card.dataset.questionId = q.id;
                 const head = node('div', undefined, 'cc-card-top'); head.append(node('span', q.subject_code, 'cc-subject cc-subject-' + q.subject_code.toLowerCase()), node('span', q.stable_key, 'cc-stable-id'));
                 const citations=node('div',undefined,'cc-source-citations');(q.source_citations||[]).forEach(c=>{const location=c.page?.match(/\d+/)?.[0],target=new URL(c.url);if(location&&c.page_jump_supported!==false&&!c.owner_public_copy)target.hash='page='+location;const a=link(target.href,c.authored?'Independently authored example · official syllabus background':c.label+(c.owner_public_copy?' · PDF page '+(c.page||'see source'):c.hosting_label==='Owner-verified ICAI mirror'?' · Verified mirror':''),c.hosting_label==='Owner-verified ICAI mirror',c.owner_public_copy===true);a.title=c.hosting_label||'Verified source PDF';a.classList.add('cc-official-citation');citations.append(a);});card.append(citations);
-                card.append(head, node('h4', q.title), node('p', q.chapter_title + ' · ' + q.syllabus_version, 'cc-meta'));
+                const identity=q.occurrences?.[0],compact=!!root.closest('.cc-v8'),displayTitle=compact&&identity?CAFCCUI.reference(identity.question_number,identity.subquestion_number):q.title;card.append(head, node('h4', displayTitle), node('p', q.chapter_title + ' · ' + q.syllabus_version, 'cc-meta'));
                 const tags = node('div', undefined, 'cc-tags');
                 q.classifications.forEach(t => tags.append(node('span', t.title + (t.heading_origin === 'editorial' ? ' · Editorial' : ' · ICAI'), 'cc-tag')));
-                (q.academic_tags||[]).filter(t=>t.kind==='standard'||t.kind==='concept'||t.kind==='owner_tag').forEach(t=>{const chip=node('button',t.label,'cc-tag');chip.type='button';chip.title='Provisional academic search tag';chip.onclick=()=>{fields.search.value=t.label;page=1;refresh();};tags.append(chip);});card.append(tags);if(q.academic_status)card.append(node('p',q.academic_status,'cc-meta'));if(q.answer_status==='pending')card.append(node('p','Answer Pending — this question is available while its solution is checked.','cc-meta'));
+                (q.academic_tags||[]).filter(t=>t.kind==='standard'||t.kind==='concept'||t.kind==='owner_tag').forEach(t=>{const chip=node('button',t.label,'cc-tag');chip.type='button';chip.title='Provisional academic search tag';chip.onclick=()=>{if(readerOnly){document.dispatchEvent(new CustomEvent('cafcc:filter-tag',{detail:{label:t.label}}));return;}fields.search.value=t.label;page=1;refresh();};tags.append(chip);});card.append(tags);if(q.academic_status)card.append(node('p',q.academic_status,'cc-meta'));if(q.answer_status==='pending')card.append(node('p','Answer Pending — this question is available while its solution is checked.','cc-meta'));
                 if (q.practice_content) {
                     const content = q.practice_content, question = node('details', undefined, 'cc-question-content'); question.open = true;
                     const body = node('div', undefined, 'cc-rich-content');
@@ -115,10 +112,13 @@
                     catch (e) { select.value = saved; tell(e.message, true); }
                     finally { select.disabled = false; }
                 });
-                const bookmark = node('button', q.notebook.bookmarked ? '★ Bookmarked' : '☆ Bookmark', 'cc-secondary cc-bookmark'); bookmark.type = 'button'; bookmark.setAttribute('aria-pressed', String(q.notebook.bookmarked));
-                bookmark.addEventListener('click', async () => { bookmark.disabled = true; try { const saved = await api('notebook/' + q.id, {bookmarked: bookmark.getAttribute('aria-pressed') !== 'true'}, false, true); bookmark.setAttribute('aria-pressed', String(saved.bookmarked)); bookmark.textContent = saved.bookmarked ? '★ Bookmarked' : '☆ Bookmark'; tell('Your bookmark is saved.'); } catch (e) { tell(e.message, true); } finally { bookmark.disabled = false; } });
-                const notes = node('details', undefined, 'cc-private-notes'), noteLabel = node('label', 'Your private note'), noteText = node('textarea'), saveNote = node('button', 'Save my note', 'cc-secondary'); noteText.value = q.notebook.note_text; noteText.maxLength = 10000; noteText.rows = 4; saveNote.type = 'button'; noteLabel.append(noteText); notes.append(node('summary', 'My private notes'), noteLabel, saveNote);
-                saveNote.addEventListener('click', async () => { saveNote.disabled = true; try { await api('notebook/' + q.id, {note_text: noteText.value}, false, true); tell('Your private note is saved.'); } catch (e) { tell(e.message, true); } finally { saveNote.disabled = false; } });
+                const bookmark = node('button', q.notebook.bookmarked ? '★ Bookmarked' : '☆ Bookmark', 'cc-secondary cc-bookmark'); bookmark.type = 'button';if(root.closest('.cc-v8'))bookmark.textContent=q.notebook.bookmarked?'★':'☆';bookmark.setAttribute('aria-label','Bookmark question');bookmark.title='Bookmark question'; bookmark.setAttribute('aria-pressed', String(q.notebook.bookmarked));
+                bookmark.addEventListener('click', async () => { bookmark.disabled = true; try { const saved = await api('notebook/' + q.id, {bookmarked: bookmark.getAttribute('aria-pressed') !== 'true'}, false, true); bookmark.setAttribute('aria-pressed', String(saved.bookmarked)); bookmark.textContent=root.closest('.cc-v8')?(saved.bookmarked?'★':'☆'):(saved.bookmarked?'★ Bookmarked':'☆ Bookmark'); tell('Your bookmark is saved.'); } catch (e) { tell(e.message, true); } finally { bookmark.disabled = false; } });
+                const notes = node('details', undefined, 'cc-private-notes'), noteLabel = node('label', 'Your private note'), noteText = node('textarea'), saveNote = node('button', 'Save my note', 'cc-secondary'), noteFeedback=node('p','', 'cc-note-status'),retryNote=node('button','Retry loading my note','cc-secondary');
+                noteText.value='';noteText.disabled=true;saveNote.disabled=true;retryNote.type=saveNote.type='button';retryNote.hidden=true;noteText.maxLength=10000;noteText.rows=4;noteLabel.append(noteText);notes.append(node('summary','My private notes'),noteFeedback,noteLabel,saveNote,retryNote);let noteHash=null,noteLoading=false,noteSaved='';
+                async function loadNote(){if(noteLoading)return;noteLoading=true;retryNote.hidden=true;noteFeedback.textContent='Loading your saved note…';try{const d=await api('v10/notebook/'+q.id);if(!notes.isConnected)return;noteText.value=d.note_text;noteSaved=d.note_text;noteHash=d.note_hash;noteText.disabled=false;saveNote.disabled=false;noteFeedback.textContent='Only you can see this note.';}catch(e){noteFeedback.textContent=e.message;retryNote.hidden=false;}finally{noteLoading=false;}}
+                notes.addEventListener('toggle',()=>{if(notes.open&&!noteHash)loadNote();});retryNote.onclick=()=>{if(noteHash&&noteText.value!==noteSaved&&!confirm('Reload the saved note and discard this unsaved edit?'))return;loadNote();};
+                saveNote.addEventListener('click',async()=>{if(!noteHash||saveNote.disabled)return;saveNote.disabled=true;try{const d=await api('v10/notebook/'+q.id,{note_text:noteText.value,expected_hash:noteHash});noteHash=d.note_hash;noteSaved=d.note_text;noteText.value=d.note_text;noteFeedback.textContent='Your private note is saved.';document.dispatchEvent(new CustomEvent('cafcc:activity'));}catch(e){noteFeedback.textContent=e.message;retryNote.hidden=false;}finally{saveNote.disabled=false;}});
                 progressLabel.append(select); const buttons = node('div', undefined, 'cc-action-buttons'); buttons.append(answerButton, bookmark); actions.append(buttons, progressLabel); card.append(actions, panel, notes); list.append(card);document.dispatchEvent(new CustomEvent('cafcc:card',{detail:{card,q}}));
             });
             const max = Math.max(1, Math.ceil(data.total / data.per_page)), prev = node('button', 'Previous', 'cc-secondary'), next = node('button', 'Next', 'cc-secondary');

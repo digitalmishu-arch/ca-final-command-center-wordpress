@@ -19,6 +19,7 @@ with sync_playwright() as p:
     expect(admin.locator('.studio-owner-decisions button')).to_have_count(3);expect(admin.locator('[data-owner-action=publish]')).to_have_text('Publish')
     admin.screenshot(path=str(ROOT/'docs/previews/v05-owner-review-ipad.png'),full_page=True)
     admin.locator('[data-owner-action=publish]').click();expect(admin.locator('#studio-detail small')).to_contain_text('approved')
+    if __import__('os').getenv('CAFCC_ADMIN_ONLY')=='1': browser.close();print('PASS v05 owner/admin browser regression');raise SystemExit(0)
     student=browser.new_page(viewport={'width':390,'height':844});calls=[];student.on('request',lambda r:calls.append(r.url) if '/answers/' in unquote(r.url) else None);login(student,'student_a');student.goto(BASE+'/?cafcc_view=explorer',wait_until='networkidle')
     student.locator('[data-filter=search]').fill('TEST-V05-OWNER');student.locator('[data-filter=search]').press('Enter');student.wait_for_function("document.querySelector('.cc-question')?.innerText.includes('₹120')")
     card=student.locator('.cc-question');expect(card).to_have_count(1);assert not calls;assert '₹40 per period' not in card.inner_text()

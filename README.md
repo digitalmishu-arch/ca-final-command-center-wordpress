@@ -1,3 +1,16 @@
+# Version 0.8.0 — compact study portal and private planner
+
+Continue from PR14/v0.7. The existing academic ZIP publication workflow, question identities and private activity remain intact. No Hostinger access or deployment is part of this release.
+
+* [One-page iPad installation/acceptance](docs/v08/IPAD-GUIDE.md)
+* [Completion matrix and honest limits](docs/v08/COMPLETION-MATRIX.md)
+* [Notes diagnosis and error-handling evidence](docs/v08/NOTES-ROOT-CAUSE.md)
+* [Additive migration and rollback](docs/v08/MIGRATION-ROLLBACK.md)
+
+The plugin contains code only. Student plans and academic content remain in WordPress, not the download. GitHub Actions builds **ca-final-command-center-0.8.0** and browser previews from authored fixtures. Physical iPad acceptance remains with the owner.
+
+---
+
 # Version 0.7.0 — student practice and January MCQs
 
 Continues PR #13 / 0.6.0. Preserves **Upload ZIP → Preview → Publish All → Questions Visible**. Adds readable theme-aware answers/tables, compact personal practice tables, clickable dashboard drill-downs, retained timer-attempt comparison, exact-hash owner-public Drive citations, independent counted Ind AS/SA facets, and a separate MCQ reader with scored attempts and timed practice.
