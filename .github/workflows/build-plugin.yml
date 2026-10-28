@@ -48,6 +48,7 @@ jobs:
       - name: Explorer, Studio, Excel, registration and private-practice browser regressions
         run: CAFCC_TEST_WEBKIT=1 bash tests/run-browser.sh
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: v070-authored-browser-previews
           path: |
