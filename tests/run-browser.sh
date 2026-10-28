@@ -15,7 +15,7 @@ cleanup_browser(){
 trap cleanup_browser EXIT
 CAFCC_PREVIEW=1 bash tests/run-integration.sh
 read -r preview_wp <work/preview-containers.txt
-docker exec "$preview_wp" php /repo/tests/preview.php
+# CAFCC_PREVIEW already prepared and verified the preview once.
 docker exec -e CAFCC_PRACTICE_DEMO=1 "$preview_wp" php /repo/tests/practice-demo.php
 python3 tests/browser-review-access.py
 CAFCC_ADMIN_ONLY=1 python3 tests/browser-v05.py
