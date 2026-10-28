@@ -20,3 +20,8 @@
 @media(prefers-reduced-motion:reduce){.cc-v8 *,.cc-v8 .cc-community-message{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 .cc-v8 [data-explorer-list] table{min-width:750px;table-layout:auto}.cc-v8 .cc-list-snippet{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-width:170px;max-width:240px;font-size:14px;line-height:1.45}.cc-v8 [data-explorer-list] td{font-size:13px;vertical-align:middle}.cc-v8 [data-explorer-list] td:nth-child(2){min-width:85px}.cc-v8 [data-explorer-list] td:last-child{min-width:95px}
+/* Legacy secondary-button hover had a higher-specificity pale fill. Bind both
+   surfaces and ink so a retained pointer never produces white-on-white controls. */
+.cc-portal.cc-v8 button.cc-secondary{background:var(--cc-panel);color:var(--cc-ink)}
+.cc-portal.cc-v8 button.cc-secondary:hover:not(:disabled),.cc-portal.cc-v8 button.cc-secondary:focus-visible{background:var(--cc-soft);color:var(--cc-ink)}
+.cc-portal.cc-v8 .cc-planner-tabs button[aria-selected=true]{background:var(--cc-soft);color:var(--cc-link);border-bottom-color:var(--cc-link)}
