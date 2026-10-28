@@ -85,7 +85,11 @@ def key_regions(path,kind):
 
 
 def extract_group(group):
-    qpath=Path(group['question_path']);apath=Path(group['answer_path']);qhash=digest(qpath.read_bytes());ahash=digest(apath.read_bytes());doc=fitz.open(qpath);lines=all_lines(doc);raw,profile=discover(doc,dict(source_type=group['source_type'],role='questions_and_answers'if group['source_type']in('rtp','exam')else'questions'));questions=[q for q in raw if q['format']=='MCQ'and q['side']=='question'];
+    qpath=Path(group['question_path']);apath=Path(group['answer_path']);qhash=digest(qpath.read_bytes());ahash=digest(apath.read_bytes());doc=fitz.open(qpath);lines=all_lines(doc);raw,profile=discover(doc,dict(source_type=group['source_type'],role='questions_and_answers'if group['source_type']in('rtp','exam')else'questions'));
+    if group.get('layout_profile')in ('six-paper-layout-discovery-2','six-paper-layout-discovery-3'):
+        import archive_profiles
+        raw,_events=archive_profiles.phases(raw,lines,group['source_type'])
+    questions=[q for q in raw if q['format']=='MCQ'and q['side']=='question'];
     first=questions[0]['start']if questions else None
     if not first:return [],dict(code='mcq_starts_missing'),[]
     last_end=max((q['end_exclusive']for q in questions),key=position)

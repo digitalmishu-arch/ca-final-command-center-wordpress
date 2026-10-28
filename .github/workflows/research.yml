@@ -38,6 +38,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_january_collection.py' -v
       - name: MCQ case, option, key geometry and source-identity regressions
         run: python3 -m unittest discover -s tests -p 'test_mcq_pipeline.py' -v
+      - name: Six-subject source identity and section-profile guards
+        run: python3 -m unittest discover -s tests -p 'test_archive_pipeline.py' -v
       - name: Build public research CODE artifact
         run: python3 scripts/build-research.py
       - uses: actions/upload-artifact@v4

@@ -1,0 +1,14 @@
+<?php
+/** Private local acceptance only. Never downloads or publishes academic content in CI. */
+require '/var/www/html/wp-load.php';
+if(DB_NAME!=='cafcc_test'||home_url()!=='http://127.0.0.1:8095'||getenv('CAFCC_PRIVATE_ARCHIVE_ACCEPTANCE')!=='1')throw new RuntimeException('Explicit private disposable installation required.');
+wp_set_current_user(get_user_by('login','test_admin')->ID);$root=getenv('CAFCC_PRIVATE_CORPUS_DIR');if(!$root||!str_starts_with(realpath($root)?:'','/repo/work/v081/private/'))throw new RuntimeException('Private package root required.');
+$out='/tmp/v081-private-package-tests.jsonl';$known=array();if(file_exists($out))foreach(file($out)as $l){$r=json_decode($l,true);if(($r['status']??'')==='imported')$known[$r['sha256']]=true;}
+global $wpdb;$rt=CAFCC_Studio::table();$mt=CAFCC_MCQ::table('questions');$before_questions=(int)$wpdb->get_var("SELECT COUNT(*) FROM $rt");$before_mcqs=(int)$wpdb->get_var("SELECT COUNT(*) FROM $mt");
+foreach(glob($root.'/*/imports/*.zip')as $path){$sha=hash_file('sha256',$path);if(isset($known[$sha]))continue;$entry=array('filename'=>basename($path),'sha256'=>$sha,'bytes'=>filesize($path),'test_approval'=>'None. All imported academic records remain Needs Review.');
+ try{$job=CAFCC_Package::upload(base64_encode(file_get_contents($path)));if(is_wp_error($job))throw new RuntimeException($job->get_error_code().': '.$job->get_error_message());$id=$job['id'];$steps=0;while($job['status']!=='completed'){if(++$steps>100)throw new RuntimeException('Import step limit');$job=CAFCC_Package::step($job['job_key'],array('cursor'=>$job['cursor'],'confirmed'=>true));if(is_wp_error($job))throw new RuntimeException($job->get_error_code().': '.$job->get_error_message());if($job['status']==='failed')throw new RuntimeException(wp_json_encode($job['report']));}
+  $qcount=(int)$wpdb->get_var("SELECT COUNT(*) FROM $rt");$mcount=(int)$wpdb->get_var("SELECT COUNT(*) FROM $mt");$again=CAFCC_Package::upload(base64_encode(file_get_contents($path)));if(is_wp_error($again)||$again['id']!==$id||(int)$wpdb->get_var("SELECT COUNT(*) FROM $rt")!==$qcount||(int)$wpdb->get_var("SELECT COUNT(*) FROM $mt")!==$mcount)throw new RuntimeException('Reimport duplicated or changed the package identity');$entry['status']='imported';$entry['package_id']=$id;$entry['steps']=$steps;$entry['idempotent_reimport']=true;
+ }catch(Throwable $e){$entry['status']='blocked';$entry['error']=$e->getMessage();}
+ file_put_contents($out,wp_json_encode($entry)."\n",FILE_APPEND);echo wp_json_encode(array('filename'=>$entry['filename'],'status'=>$entry['status'])),PHP_EOL;
+}
+echo wp_json_encode(array('subjective_added'=>(int)$wpdb->get_var("SELECT COUNT(*) FROM $rt")-$before_questions,'mcq_added'=>(int)$wpdb->get_var("SELECT COUNT(*) FROM $mt")-$before_mcqs,'publication_actions'=>0)),PHP_EOL;
