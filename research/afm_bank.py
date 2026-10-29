@@ -90,7 +90,7 @@ def build(manifest, checkpoints, output, target_registry):
         if answer_source:sources[prior.source_key(answer_source)]=source(answer_source)
         parent_answers=[x['region']for x in payloads[answer_source['file_id']]['records']if x['region']['side']=='answer']if answer_source else[]
         with fitz.open(r['local_path'])as doc:
-            ac=fitz.open(answer_source['local_path'])if answer_source else None;cache={};answercache={}
+            ac=fitz.open(answer_source['local_path'])if answer_source else None;cache={};answercache={};mcqtablecache={}
             try:
                 for parent in p['records']:
                     q=parent['region']
@@ -157,7 +157,7 @@ def build(manifest, checkpoints, output, target_registry):
                     als=afm.cleaned_lines(ac);begin=next((i for i,l in enumerate(als)if re.search(r'ANSWER\s+TO\s+PART\s*[–-]?\s*I\b|^Answer Key$',l['text'],re.I)),0);end=next((i for i,l in enumerate(als[begin+1:],begin+1)if re.match(r'^(?:ANSWERS?\s+(?:OF|TO)\s+)?PART\s*[–-]?\s*II\b',l['text'],re.I)),len(als));global_keys=afm_mcq.keys_in(als[begin:end],ac)
                 for mp in mcq_parents:
                     ma=next((x for x in parent_answers if x['reference']==mp['reference']),None)
-                    extracted=afm_mcq.extract(mp,doc,ma,ac,global_keys,scope='booklet'if d['source_type']=='other'else'')
+                    extracted=afm_mcq.extract(mp,doc,ma,ac,global_keys,scope='booklet'if d['source_type']=='other'else'',table_cache=mcqtablecache)
                     for x in extracted:
                         stable='MCQ-'+gold.sha(r['source_hash']+'|'+x['source_section']+'|'+x['reference'])[:48]
                         # Keep all previous global MTP identities exactly.

@@ -91,6 +91,13 @@ class AFMReconciliationTests(unittest.TestCase):
         p.insert_text((108,p.rect.height*.91),'Original calculation = 371.')
         ls=afm.cleaned_lines(doc);text=' '.join(l['text']for l in ls)
         self.assertIn('14.',text);self.assertIn('371',text)
+    def test_offset_printed_folios_are_not_financial_amounts(self):
+        import fitz
+        doc=fitz.open()
+        for pn in range(1,6):
+            p=doc.new_page();p.insert_text((108,90),str(pn+4));p.insert_text((108,180),'Original financial amount 371.');p.insert_text((300,180),'37')
+        rows=afm.native_lines(doc)
+        self.assertFalse(any(l['bbox'][1]<100 and l['text'].isdigit()for l in rows));self.assertEqual(sum(l['text']=='37'for l in rows),5)
     def test_long_taxonomy_keys_fit_existing_schema_without_title_changes(self):
         long='source-backed-historical-context-'+'x'*110
         bank=dict(taxonomies={'edition':dict(editions=[],nodes=[dict(node_key=long,parent_key='',title='Original fixture title')])},subjective=[dict(import_record=dict(ai_proposal=dict(primary_path=[dict(node_key=long)],additional_node_keys=[long])))])

@@ -9,6 +9,7 @@ import re
 import fr_corpus as fr
 import gold_layout as gold
 import mcq_pipeline as common
+import afm_tables
 from afm_reconcile import CASE, ANSWER_CASE, OPTION, ROMAN, pos, make_region
 
 def number(text, roman=False):
@@ -66,7 +67,9 @@ def explanation_for(key, keys, parent, doc, table_cache=None):
     if not rows:return None
     return gold.reconstruct(dict(lines=rows,start=fr.where(rows[0]),end_exclusive=dict(page=end[0],bbox=[0,end[1],0,end[1]],column=0)),doc,table_cache)
 
-def extract(parent, doc, answer_parent=None, answer_doc=None, global_keys=None, scope=''):
+def extract(parent, doc, answer_parent=None, answer_doc=None, global_keys=None, scope='', table_cache=None):
+    if table_cache is None:table_cache={}
+    def render(q):return afm_tables.normalize(gold.reconstruct(q,doc,table_cache),doc)
     lines=parent['lines'];groups=option_groups(lines);starts=[]
     roman=any(ROMAN.match(l['text'])for l in lines) and parent['format']=='MCQ_CASE' and parent['reference']not in ('MCQ',)
     # Case booklets also use MCQ_CASE, with decimal restarted question numbers.
@@ -84,7 +87,7 @@ def extract(parent, doc, answer_parent=None, answer_doc=None, global_keys=None, 
         boundaries=[i for i in range(at+1,stop)if CASE.fullmatch(lines[i]['text'])]
         if boundaries:stop=boundaries[0]
         segment=lines[at:stop]
-        question=gold.reconstruct(dict(lines=lines[at:item['options'][0][0]],start=fr.where(lines[at]),end_exclusive=fr.where(item['options'][0][1])),doc)
+        question=render(dict(lines=lines[at:item['options'][0][0]],start=fr.where(lines[at]),end_exclusive=fr.where(item['options'][0][1])))
         choices=[];issues=[]
         if [m[2]for m in item['options']]!=list('ABCD'):issues.append('ambiguous_duplicate_printed_option_labels_no_relabelling_allowed')
         for k,(oi,marker,label)in enumerate(item['options']):
@@ -102,7 +105,7 @@ def extract(parent, doc, answer_parent=None, answer_doc=None, global_keys=None, 
             body=[l for l in body if l['text'].strip()]
             if not body:issues.append('incomplete_option_'+label);continue
             endpos=fr.where(lines[end])if end<len(lines)else parent['end_exclusive']
-            rich=gold.reconstruct(dict(lines=body,start=fr.where(marker),end_exclusive=endpos),doc)
+            rich=render(dict(lines=body,start=fr.where(marker),end_exclusive=endpos))
             choices.append(dict(id=label,html=rich['body_html'],source_page=marker['page'],source_bbox=marker['bbox'],checks=rich['fidelity'],structure=rich['blocks']))
             issues+=['option_'+label+'_'+w for w in rich['warnings']]
         previous_cases=[i for i in range(at)if CASE.fullmatch(lines[i]['text'])]
@@ -113,7 +116,7 @@ def extract(parent, doc, answer_parent=None, answer_doc=None, global_keys=None, 
         facts=lines[cstart:firstcase]
         scenario=None
         if facts and (previous_cases or roman or scope=='booklet'):
-            sr=gold.reconstruct(dict(lines=facts,start=fr.where(facts[0]),end_exclusive=fr.where(lines[firstcase])),doc)
+            sr=render(dict(lines=facts,start=fr.where(facts[0]),end_exclusive=fr.where(lines[firstcase])))
             scenario=dict(key='AFM-MCQ-CASE-'+gold.sha(scope+'|'+str(pos(facts[0])))[:40],html=sr['body_html'],checks=sr['fidelity'],source_location=dict(start=fr.where(facts[0]),end_exclusive=fr.where(lines[firstcase])))
             issues+=sr['warnings']
         local=keys_in(answer_parent['lines'],answer_doc)if answer_parent and answer_doc else{}

@@ -102,7 +102,16 @@ def native_lines(doc):
                 row=dict(page=p.number+1,bbox=box,text=text,font=main['font'],size=main['size'],bold=bool(main['flags']&16 or re.search('bold|black',main['font'],re.I)),rgb=[(c>>16)&255,(c>>8)&255,c&255],column=0,spans=[dict(text=s['text'],bbox=list(s['bbox']),flags=s['flags'],font=s['font'])for s in spans])
                 if any(x['page']==row['page']and x['text']==text and abs(x['bbox'][0]-box[0])<1 and abs(x['bbox'][1]-box[1])<2 for x in lines[-10:]):continue
                 lines.append(row)
-    return lines
+    # Printed folios need not equal PDF page indices (front matter creates an
+    # offset). Learn repeated numeric running furniture from geometry, font,
+    # colour and a constant page offset, never from a fixed body-height crop.
+    folios=defaultdict(list)
+    for i,l in enumerate(lines):
+        p=doc[l['page']-1];x,y,x1,_=l['bbox']
+        if not re.fullmatch(r'\d{1,3}',l['text'])or not(y<140 or y>p.rect.height*.82)or not(x<150 or abs((x+x1)/2-p.rect.width/2)<45):continue
+        key=(round(x/8),round(y/8),l['font'],round(l['size'],1),tuple(l['rgb']),int(l['text'])-l['page']);folios[key].append(i)
+    omit={i for indexes in folios.values()if len({lines[j]['page']for j in indexes})>=3 for i in indexes}
+    return [l for i,l in enumerate(lines)if i not in omit]
 
 def cleaned_lines(doc):
     lines=native_lines(doc)
