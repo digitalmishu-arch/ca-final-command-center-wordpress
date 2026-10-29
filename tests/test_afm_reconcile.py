@@ -113,5 +113,10 @@ class AFMReconciliationTests(unittest.TestCase):
         for col,values,x0,x1,span in [(0,labels,65,190,3),(1,a,200,280,1),(2,b,300,380,1)]:model['cells'].append(dict(row=0,column=col,rowspan=span,colspan=1,text='\n'.join(values),bbox=[x0,100,x1,175]))
         fixed,ok=afm_tables.repair(model,p);self.assertTrue(ok);self.assertEqual(fixed['rows'],3)
         for n in range(3):self.assertEqual([c['text']for c in fixed['cells']if c['row']==n],[labels[n],a[n],b[n]])
+    def test_vertical_math_fragments_are_not_declared_readable_by_numeric_checks(self):
+        blocks=[dict(type='paragraph',html=x,page=1,bbox=[72,100+i*15,90,112+i*15])for i,x in enumerate(['n','(','1','+','r',')','2'])]
+        rich=dict(blocks=blocks,body_html='',warnings=[],fidelity=dict(passed=True))
+        fixed=afm_tables.normalize(rich,None);self.assertFalse(fixed['fidelity']['passed']);self.assertTrue(fixed['fidelity']['numeric_token_conservation_passed']);self.assertTrue(fixed['layout_exceptions'])
+        self.assertFalse(afm_tables.formula_fragments([dict(type='paragraph',html='An original complete sentence.')]))
 
 if __name__=='__main__':unittest.main()

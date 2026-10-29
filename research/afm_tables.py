@@ -2,10 +2,22 @@
 from collections import defaultdict
 from copy import deepcopy
 import re
+import html
 import gold_layout as gold
 
 def merged_stub(model):
     return any(c['column']==0 and c['rowspan']>1 and len(c['text'].splitlines())>=3 for c in model['cells'])
+
+def formula_fragments(blocks):
+    runs=[];current=[]
+    def finish():
+        if len(current)>=6 and sum(bool(re.search(r'[A-Za-zΑ-Ωα-ω=+−^√∑*/÷()]',x['text']))for x in current)>=2:runs.append(list(current))
+        current.clear()
+    for b in blocks:
+        text=html.unescape(re.sub('<[^>]+>','',b.get('html',''))).strip()
+        if b['type']=='paragraph'and 0<len(text)<=5 and re.fullmatch(r'[\dA-Za-zΑ-Ωα-ω\s=+−–^√∑*/÷().,%\-]+',text):current.append(dict(text=text,page=b.get('page'),bbox=b.get('bbox')))
+        else:finish()
+    finish();return runs
 
 def repair(model,page):
     if not merged_stub(model):return model,False
@@ -48,5 +60,10 @@ def normalize(rich,doc):
     if changed:
         out['body_html']='\n'.join(gold.table_html(b)if b['type']=='table'else'<'+('h4'if b['type']=='heading'else'p')+'>'+b['html']+'</'+('h4'if b['type']=='heading'else'p')+'>'for b in out['blocks'])
     if unresolved:out['warnings']=sorted(set(out['warnings']+['merged_financial_stub_geometry_requires_review']))
+    fragments=formula_fragments(out['blocks'])
+    if fragments:
+        out['layout_exceptions']=dict(fragmented_formula_runs=fragments)
+        out['warnings']=sorted(set(out['warnings']+['fragmented_formula_requires_source_layout_review']))
+        out['fidelity']['numeric_token_conservation_passed']=out['fidelity']['passed'];out['fidelity']['passed']=False
     out['afm_table_geometry_repaired']=changed
     return out

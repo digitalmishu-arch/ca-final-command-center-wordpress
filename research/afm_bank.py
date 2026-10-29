@@ -115,6 +115,7 @@ def build(manifest, checkpoints, output, target_registry):
                         if any(w.startswith('question_boundary')for w in warnings):issues.append('question_integrity_failed_independent_part_boundary_requires_review')
                         if state!='A':issues.append('answer_mapping_conflict_state_'+state+'_needs_review')
                         for side,value in [('question',body),('answer',answer)]:
+                            if value and value.get('layout_exceptions'):issues.append('question_integrity_failed_fragmented_formula'if side=='question'else'answer_mapping_conflict_fragmented_formula')
                             if value and any(unicodedata.category(c)in('Co','Cn')or c=='\ufffd'for c in value['plain_text']):
                                 value['fidelity']['passed']=False;issues.append(('question_integrity_failed_'if side=='question'else'answer_formula_conflict_')+'unsupported_source_font_glyph')
                         proposed=afm.tags(child,matched)

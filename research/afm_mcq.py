@@ -65,7 +65,8 @@ def explanation_for(key, keys, parent, doc, table_cache=None):
         if l['page']==key['page']and abs(l['bbox'][1]-key['bbox'][1])<5 and l['bbox'][0]<key['bbox'][2]+2:continue
         rows.append(l)
     if not rows:return None
-    return gold.reconstruct(dict(lines=rows,start=fr.where(rows[0]),end_exclusive=dict(page=end[0],bbox=[0,end[1],0,end[1]],column=0)),doc,table_cache)
+    region=dict(lines=rows,start=fr.where(rows[0]),end_exclusive=dict(page=end[0],bbox=[0,end[1],0,end[1]],column=0))
+    return afm_tables.normalize(gold.reconstruct(region,doc,table_cache),doc)
 
 def extract(parent, doc, answer_parent=None, answer_doc=None, global_keys=None, scope='', table_cache=None):
     if table_cache is None:table_cache={}

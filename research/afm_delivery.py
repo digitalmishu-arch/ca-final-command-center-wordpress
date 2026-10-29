@@ -6,7 +6,7 @@ established Academic Package v1 format. Never approves or publishes records.
 from collections import Counter,defaultdict
 from copy import deepcopy
 from pathlib import Path
-import argparse,html,json,re,zipfile,shutil
+import argparse,html,json,re,zipfile,shutil,posixpath
 from datetime import datetime,timezone
 from openpyxl import Workbook
 from openpyxl.styles import Font,PatternFill,Alignment,Protection
@@ -134,6 +134,9 @@ def build(bank_path,output,revision,evidence=None):
         folder.mkdir(parents=True,exist_ok=True);path=folder/(r['stable_id']+'.html');details[r['stable_id']]=path.relative_to(base).as_posix()
         common=bank['scenarios'].get(r.get('practice_structure',{}).get('scenario_key'),{}).get('body_html','')if'options'not in r else(r.get('scenario')or{}).get('html','');question=r.get('question_html',r.get('rich_content',{}).get('question',{}).get('body_html',''));answer=r.get('rich_content',{}).get('answer',{}).get('body_html','')or'<p>ANSWER PENDING</p>'
         if row.get('answer_candidate'):answer+='<h3>Unassigned parent answer candidate — NOT the matched child solution</h3><p>Candidate PDF page '+str(row.get('answer_candidate_page',''))+'</p>'+row['answer_candidate']['body_html']
+        for preview in row.get('formula_previews',[]):
+            url=posixpath.relpath(preview['path'],path.relative_to(base).parent.as_posix())
+            answer+='<p><a href="'+html.escape(url,quote=True)+'">Private original '+html.escape(preview['side'])+' formula crop · PDF '+str(preview['page'])+'</a> — source-layout correction required.</p>'
         if'options'in r:question+=''.join('<p><b>'+o['id']+'</b> '+o['html']+'</p>'for o in r['options']);answer='<p>Explicit source key: '+html.escape(', '.join(r['correct_options'])or'ANSWER PENDING')+'</p>'+r.get('explanation_html','')
         warnings=r.get('blocking_exceptions',r.get('exceptions',[]));path.write_text('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private AFM Needs Review</title><style>:root{color-scheme:light dark}body{font:17px/1.65 system-ui;max-width:1050px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;max-width:100%;display:block;overflow-x:auto}td,th{border:1px solid #82909c;padding:8px}th{font-weight:700}a{color:#008f98}pre{white-space:pre-wrap}</style><h1>Needs Review — '+html.escape(r['stable_id'])+'</h1><p>'+html.escape(row['original_subject']+' · '+r['source_type']+' · '+r['exam_attempt']+' · '+r.get('mtp_series','')+' · Q'+r['reference']+('('+r['subreference']+')'if r.get('subreference')else''))+'</p><p><a href="'+r['official_url']+'">Original PDF</a> · PDF '+str(r['question_page'])+'</p><h2>Common information</h2>'+common+'<h2>Question</h2>'+question+'<h2>Answer / source-key candidate</h2>'+answer+'<p><a href="'+r.get('answer',{}).get('official_url','')+'">Answer PDF</a> · PDF '+str(r.get('answer',{}).get('page',''))+'</p><h2>Actual exceptions</h2><pre>'+html.escape('\n'.join(warnings))+'</pre>')
     for name,data in [('source-manifest/source-register.json',bank['source_inventory']),('coverage-reports/source-by-source.json',bank['coverage']),('coverage-reports/answer-matching.json',[dict(question_id=x['import_record']['stable_id'],state=x['match_state'],source_file_id=x['source_file_id'],answer_file_id=x['answer_file_id'],evidence=x['match_evidence'])for x in bank['subjective']]),('integrity/stable-id-reconciliation.json',bank['id_reconciliation']),('source-manifest/source-copies.json',bank['source_copies'])]:cat.write(base/name,data)
