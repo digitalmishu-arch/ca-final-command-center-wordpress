@@ -244,9 +244,9 @@ def reconstruct(q,document,table_cache=None):
     return dict(schema='cafcc-rich-v2',body_html=body,plain_text=plain,blocks=blocks,source_text_sha256=sha(raw_plain),symbol_normalizations=normalizations,fidelity=fidelity,warnings=sorted(set(warnings)),transcription_status='needs_review')
 
 
-def discover(document,metadata):
+def discover(document,metadata,source_lines=None):
     import fr_corpus as old
-    lines=old.all_lines(document);lefts=Counter(round(l['bbox'][0]) for l in lines if re.match(r'^\d{1,2}\.(?:\s|$)',l['text']));margin=lefts.most_common(1)[0][0] if lefts else 72
+    lines=old.all_lines(document) if source_lines is None else source_lines;lefts=Counter(round(l['bbox'][0]) for l in lines if re.match(r'^\d{1,2}\.(?:\s|$)',l['text']));margin=lefts.most_common(1)[0][0] if lefts else 72
     book_style=any(re.fullmatch(r'Questions?\s+\d+',l['text'],re.I) for l in lines) and any(re.fullmatch(r'Answer',l['text'],re.I) for l in lines)
     # A sentence describing Part II in the instructions is not a section start.
     part_heading=re.compile(r'^(?:(?:ANSWERS?)(?:\s+TO|\s+OF)?\s+)?PART\s*[-–—]?\s*(II|I)\b(?=\s*(?:$|[-–—:]|Case\b|Multiple\b|Descriptive\b|Subjective\b))',re.I)
