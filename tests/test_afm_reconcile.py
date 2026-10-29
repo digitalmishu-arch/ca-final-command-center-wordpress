@@ -134,5 +134,10 @@ class AFMReconciliationTests(unittest.TestCase):
             return afm.gold.reconstruct(q,doc,cache)
         first=render(1);render(2);again=render(1)
         self.assertIn('<table',first['body_html']);self.assertEqual(first['body_html'],again['body_html']);self.assertTrue(again['fidelity']['passed']);self.assertNotIn('97',again['body_html'])
+    def test_wrapped_row_label_stays_with_its_calculation_and_amount(self):
+        model=dict(type='table',method='aligned_financial_rows',page=1,bbox=[72,100,360,180],rows=2,columns=2,header_rows=0,cells=[dict(row=0,column=0,rowspan=1,colspan=1,text='(a) Original prior',bbox=[72,100,220,115]),dict(row=0,column=1,rowspan=1,colspan=1,text='37',bbox=[300,100,360,115]),dict(row=1,column=0,rowspan=1,colspan=1,text='= 37 / 4',bbox=[90,140,220,155]),dict(row=1,column=1,rowspan=1,colspan=1,text='9.25',bbox=[300,140,360,155])])
+        para=dict(type='paragraph',page=1,bbox=[72,125,240,145],html='(b) Original current')
+        rich=dict(blocks=[model,para],body_html=afm.gold.table_html(model)+'<p>'+para['html']+'</p>',warnings=[],fidelity=dict(passed=True))
+        fixed=afm_tables.normalize(rich,None);self.assertTrue(fixed['fidelity']['passed']);self.assertEqual(len(fixed['blocks']),1);self.assertIn('(b) Original current\n= 37 / 4',fixed['blocks'][0]['cells'][2]['text']);self.assertIn('9.25',fixed['body_html'])
 
 if __name__=='__main__':unittest.main()
