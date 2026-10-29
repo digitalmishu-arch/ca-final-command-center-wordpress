@@ -100,8 +100,16 @@ final class CAFCC_Package {
     public static function upload($encoded){
         if(is_wp_error($e=CAFCC_Studio::admin()))return $e;if(is_wp_error($e=CAFCC_Bank_DB::transactional()))return $e;$decoded=self::decode($encoded);if(is_wp_error($decoded))return $decoded;global $wpdb;$t=self::table();$owner=get_current_user_id();$m=$decoded['manifest'];$old=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE owner_id=%d AND package_key=%s",$owner,$m['package_key']),ARRAY_A);
         if($old){if(!hash_equals($old['archive_sha256'],$decoded['archive_sha256']))return CAFCC_Repository::error('This package key already has different bytes. Use a new revision; prior jobs and corrections remain.',409);CAFCC_Owner::sync_package((int)$old['id']);return self::view($old);}
-        $reports=array();$probe=CAFCC_Academic::transaction(function()use($decoded,&$reports){foreach($decoded['items'] as $item){$r=self::execute_item($item['kind'],$item['payload']);if(is_wp_error($r))return $r;$reports[]=array('path'=>$item['path'],'kind'=>$item['kind'],'result'=>$r);}return new WP_Error('cafcc_package_preview_rollback','Validated preview; no records committed.');});
-        if($probe->get_error_code()!=='cafcc_package_preview_rollback')return $probe;
+        $reports=array();
+        if(($m['format']??'')===CAFCC_Collection::FORMAT){
+            // Do not run a whole subject's SQL dry-run inside one web request.
+            // Every child still uses the unchanged complete dependency/data
+            // preview before its bounded draft transaction can commit.
+            foreach($decoded['items']as $item)$reports[]=array('path'=>$item['path'],'kind'=>'collection','result'=>array('structure_checksums'=>'passed','record_validation'=>'pending_bounded_child_preview','publication_actions'=>0));
+        }else{
+            $probe=CAFCC_Academic::transaction(function()use($decoded,&$reports){foreach($decoded['items'] as $item){$r=self::execute_item($item['kind'],$item['payload']);if(is_wp_error($r))return $r;$reports[]=array('path'=>$item['path'],'kind'=>$item['kind'],'result'=>$r);}return new WP_Error('cafcc_package_preview_rollback','Validated preview; no records committed.');});
+            if($probe->get_error_code()!=='cafcc_package_preview_rollback')return $probe;
+        }
         return CAFCC_Academic::transaction(function()use($decoded,$m,$reports,$owner){global $wpdb;$job=array('owner_id'=>$owner,'job_key'=>wp_generate_password(40,false,false),'package_key'=>$m['package_key'],'archive_sha256'=>$decoded['archive_sha256'],'status'=>'preview','cursor_position'=>0,'manifest'=>wp_json_encode($m),'report'=>wp_json_encode(array('preview'=>$reports,'applied'=>array(),'blocking_issue'=>null)),'created_at'=>current_time('mysql',true),'updated_at'=>current_time('mysql',true));if(false===$wpdb->insert(self::table(),$job))return CAFCC_Repository::error('Could not retain import preview.',500);$id=$wpdb->insert_id;
             foreach($decoded['items'] as $i=>$item)if(false===$wpdb->insert(self::items_table(),array('package_id'=>$id,'ordinal'=>$i,'kind'=>$item['kind'],'file_sha256'=>$item['sha256'],'payload'=>wp_json_encode($item['payload']),'status'=>'pending','result'=>'{}')))return CAFCC_Repository::error('Cannot retain private import checkpoint.',500);
             if(!CAFCC_Bank_DB::audit_master('academic_package',$id,null,array('package_key'=>$m['package_key'],'archive_sha256'=>$job['archive_sha256'],'phase'=>'preview')))return CAFCC_Repository::error('Cannot retain import audit.',500);return self::view(array_merge($job,array('id'=>$id)));});
