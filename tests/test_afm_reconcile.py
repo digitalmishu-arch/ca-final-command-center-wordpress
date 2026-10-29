@@ -118,5 +118,21 @@ class AFMReconciliationTests(unittest.TestCase):
         rich=dict(blocks=blocks,body_html='',warnings=[],fidelity=dict(passed=True))
         fixed=afm_tables.normalize(rich,None);self.assertFalse(fixed['fidelity']['passed']);self.assertTrue(fixed['fidelity']['numeric_token_conservation_passed']);self.assertTrue(fixed['layout_exceptions'])
         self.assertFalse(afm_tables.formula_fragments([dict(type='paragraph',html='An original complete sentence.')]))
+    def test_page_table_cache_is_stable_after_extracting_another_page(self):
+        import fitz
+        doc=fitz.open()
+        for page_index,values in enumerate([('37','51'),('words only','no figures')]):
+            p=doc.new_page()
+            for x in [72,240,340]:p.draw_line((x,100),(x,190))
+            for y in [100,130,160,190]:p.draw_line((72,y),(340,y))
+            headings=('Particulars','Amount')if page_index==0 else('Explanation','Description')
+            for n,texts in enumerate([headings,('Original A',values[0]),('Original B',values[1])]):
+                for x,t in zip([80,250],texts):p.insert_text((x,120+n*30),t)
+        cache={}
+        def render(pn):
+            lines=[l for l in afm.cleaned_lines(doc)if l['page']==pn];q=region(lines);q['start']=dict(page=pn,bbox=[0,90,0,90],column=0);q['end_exclusive']=dict(page=pn,bbox=[0,200,0,200],column=0)
+            return afm.gold.reconstruct(q,doc,cache)
+        first=render(1);render(2);again=render(1)
+        self.assertIn('<table',first['body_html']);self.assertEqual(first['body_html'],again['body_html']);self.assertTrue(again['fidelity']['passed']);self.assertNotIn('97',again['body_html'])
 
 if __name__=='__main__':unittest.main()

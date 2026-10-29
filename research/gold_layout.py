@@ -185,6 +185,18 @@ def borderless_tables(selected,used):
     return models
 
 
+class TableSnapshot:
+    """Freeze PyMuPDF's page-local table extraction before another page runs.
+
+    Table.extract() consults mutable library extraction state. Retaining a raw
+    Table object in a multi-page cache can therefore change shared-case HTML.
+    """
+    def __init__(self,table):
+        self.bbox=tuple(table.bbox);self.cells=tuple(tuple(c)if c else None for c in table.cells)
+        self._rows=tuple(tuple(row)for row in table.extract())
+    def extract(self):return [list(row)for row in self._rows]
+
+
 def reconstruct(q,document,table_cache=None):
     lines=q['lines'];blocks=[];warnings=[];used=set()
     for pn in sorted({l['page'] for l in lines}):
@@ -193,7 +205,7 @@ def reconstruct(q,document,table_cache=None):
         try:
             if table_cache is not None and pn in table_cache:tables=table_cache[pn]
             else:
-                tables=page.find_tables(strategy='lines_strict').tables
+                tables=[TableSnapshot(table)for table in page.find_tables(strategy='lines_strict').tables]
                 if table_cache is not None:table_cache[pn]=tables
         except Exception:tables=[];warnings.append('table_detection_failed_page_'+str(pn))
         for t in tables:

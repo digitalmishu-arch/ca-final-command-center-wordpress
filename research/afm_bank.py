@@ -185,6 +185,19 @@ def build(manifest, checkpoints, output, target_registry):
         sid=row['import_record']['stable_id']
         if sid in seen:raise ValueError('Duplicate new stable subjective identity '+sid)
         seen.add(sid);distinct.append(row)
+    mcq_ids=[x['import_record']['stable_id']for x in mcqs]
+    if len(set(mcq_ids))!=len(mcq_ids):raise ValueError('Repeated MCQ stable identity: preserve duplicate printed numbers as distinct source occurrences')
+    common={};conflicting=set()
+    for row in mcqs:
+        scenario=row['import_record'].get('scenario')
+        if not scenario:continue
+        sk=(scenario['source_hash'],scenario['key']);signature=gold.sha(afm.packed((scenario['html'],scenario['checks'])))
+        if sk in common and common[sk]!=signature:conflicting.add(sk)
+        common[sk]=signature
+    for row in mcqs:
+        scenario=row['import_record'].get('scenario')
+        if scenario and (scenario['source_hash'],scenario['key'])in conflicting:
+            row['import_eligible']=False;row['import_record']['exceptions'].append('shared_case_content_conflict_requires_review')
     by_coverage={x['file_id']:x for x in coverage}
     for copy in copies:
         item=by_coverage[copy['file_id']];canonical=by_coverage[copy['canonical_file_id']]
