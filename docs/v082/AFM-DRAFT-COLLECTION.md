@@ -11,7 +11,7 @@ A whole-subject delivery can contain multiple source/attempt-specific Academic P
 3. WordPress staging → Plugins → Add New → Upload Plugin → select that inner plugin ZIP → replace the installed version. Do not uninstall it. Confirm version 0.8.2.
 4. Download the private AFM academic collection ZIP. **Keep this ZIP compressed for uploading.** It is academic data, not a plugin.
 5. CA Final Command Center → Upload Questions → choose the entire AFM ZIP → Preview → inspect the actual counts → Save as Drafts. Keep the tab open. Resume saved import if disconnected.
-6. Question Library → All records → AFM for subjective drafts. Use the MCQ Library separately. Source/attempt child memberships remain available; the collection does not replace the current January FR pilot filter.
+6. Question Library → selected package → AFM collection for its exact subjective drafts. Select the same collection in MCQ Library for its separate MCQ drafts. Source/attempt child memberships remain available; the collection does not replace the current January FR pilot filter.
 7. To read the workbook, uncompress a separate downloaded copy in Files and open `AFM/academic-review/AFM-Owner-Review.xlsx` in Excel or Numbers. Full HTML is retained beside source/year/attempt details when Excel's cell limit is reached.
 
 Research workbook choices are not automatically applied as publication approvals. Use a fresh WordPress review export and its revision-safe decision workflow for applying later decisions. All real records are Needs Review.

@@ -61,4 +61,18 @@ final class CAFCC_Collection {
     public static function preview($id){
         global $wpdb;$row=$wpdb->get_row($wpdb->prepare('SELECT owner_id,manifest FROM '.CAFCC_Package::table().' WHERE id=%d',$id),ARRAY_A);if(!$row||(int)$row['owner_id']!==get_current_user_id())return CAFCC_Repository::error('Private collection not found.',404);$m=json_decode($row['manifest'],true);if(($m['format']??'')!==self::FORMAT)return null;$c=$m['coverage'];return array('record_kind'=>'collection','draft_only'=>true,'count'=>$c['draft_candidates'],'question_bodies'=>$c['question_bodies'],'answer_candidates'=>$c['answer_candidates'],'sources'=>$c['sources'],'samples'=>$m['samples'],'existing_rights_active'=>false,'groups'=>$m['groups'],'validation_scope'=>'structure_and_checksums_verified_records_validated_per_child_before_commit','note'=>'One upload. Structure and checksums verified; each source batch receives full record validation before its draft checkpoint. All new records remain Needs Review. Use Question Library and MCQ Library for later owner publication decisions.');
     }
+    public static function sync($id){
+        if(is_wp_error($e=CAFCC_Studio::admin()))return $e;global $wpdb;
+        $p=$wpdb->get_row($wpdb->prepare('SELECT owner_id,status,manifest FROM '.CAFCC_Package::table().' WHERE id=%d',$id),ARRAY_A);
+        if(!$p||(int)$p['owner_id']!==get_current_user_id())return CAFCC_Repository::error('Private collection not found.',404);
+        $m=json_decode($p['manifest'],true);if(($m['format']??'')!==self::FORMAT)return CAFCC_Repository::error('Choose a subject collection.');
+        $membership=CAFCC_Owner::table('membership');$mcqs=CAFCC_MCQ::table('members');
+        foreach($m['groups']as $i=>$g){
+            $child=(int)$wpdb->get_var($wpdb->prepare('SELECT id FROM '.CAFCC_Package::table()." WHERE owner_id=%d AND package_key=%s AND archive_sha256=%s AND status='completed'",get_current_user_id(),$g['package_key'],$m['items'][$i]['sha256']));
+            if(!$child){if($p['status']==='completed')return CAFCC_Repository::error('A completed child checkpoint is missing.',409);continue;}
+            if(false===$wpdb->query($wpdb->prepare("INSERT IGNORE INTO $membership (package_id,review_id,candidate_id,imported_revision,source_hash) SELECT %d,review_id,candidate_id,imported_revision,source_hash FROM $membership WHERE package_id=%d",$id,$child)))return CAFCC_Repository::error('Cannot retain collection question membership.',500);
+            if(false===$wpdb->query($wpdb->prepare("INSERT IGNORE INTO $mcqs (package_id,mcq_id) SELECT %d,mcq_id FROM $mcqs WHERE package_id=%d",$id,$child)))return CAFCC_Repository::error('Cannot retain collection MCQ membership.',500);
+        }
+        return array('package_id'=>$id,'members'=>(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $membership WHERE package_id=%d",$id)),'mcq_members'=>(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $mcqs WHERE package_id=%d",$id)),'child_packages'=>count($m['groups']),'note'=>'One exact collection filter; original child memberships and the current FR pilot are retained.');
+    }
 }
