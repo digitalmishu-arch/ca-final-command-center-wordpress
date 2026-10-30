@@ -185,6 +185,18 @@ def borderless_tables(selected,used):
     return models
 
 
+class TableSnapshot:
+    """Freeze PyMuPDF's page-local table extraction before another page runs.
+
+    Table.extract() consults mutable library extraction state. Retaining a raw
+    Table object in a multi-page cache can therefore change shared-case HTML.
+    """
+    def __init__(self,table):
+        self.bbox=tuple(table.bbox);self.cells=tuple(tuple(c)if c else None for c in table.cells)
+        self._rows=tuple(tuple(row)for row in table.extract())
+    def extract(self):return [list(row)for row in self._rows]
+
+
 def reconstruct(q,document,table_cache=None):
     lines=q['lines'];blocks=[];warnings=[];used=set()
     for pn in sorted({l['page'] for l in lines}):
@@ -193,7 +205,7 @@ def reconstruct(q,document,table_cache=None):
         try:
             if table_cache is not None and pn in table_cache:tables=table_cache[pn]
             else:
-                tables=page.find_tables(strategy='lines_strict').tables
+                tables=[TableSnapshot(table)for table in page.find_tables(strategy='lines_strict').tables]
                 if table_cache is not None:table_cache[pn]=tables
         except Exception:tables=[];warnings.append('table_detection_failed_page_'+str(pn))
         for t in tables:
@@ -244,9 +256,9 @@ def reconstruct(q,document,table_cache=None):
     return dict(schema='cafcc-rich-v2',body_html=body,plain_text=plain,blocks=blocks,source_text_sha256=sha(raw_plain),symbol_normalizations=normalizations,fidelity=fidelity,warnings=sorted(set(warnings)),transcription_status='needs_review')
 
 
-def discover(document,metadata):
+def discover(document,metadata,source_lines=None):
     import fr_corpus as old
-    lines=old.all_lines(document);lefts=Counter(round(l['bbox'][0]) for l in lines if re.match(r'^\d{1,2}\.(?:\s|$)',l['text']));margin=lefts.most_common(1)[0][0] if lefts else 72
+    lines=old.all_lines(document) if source_lines is None else source_lines;lefts=Counter(round(l['bbox'][0]) for l in lines if re.match(r'^\d{1,2}\.(?:\s|$)',l['text']));margin=lefts.most_common(1)[0][0] if lefts else 72
     book_style=any(re.fullmatch(r'Questions?\s+\d+',l['text'],re.I) for l in lines) and any(re.fullmatch(r'Answer',l['text'],re.I) for l in lines)
     # A sentence describing Part II in the instructions is not a section start.
     part_heading=re.compile(r'^(?:(?:ANSWERS?)(?:\s+TO|\s+OF)?\s+)?PART\s*[-–—]?\s*(II|I)\b(?=\s*(?:$|[-–—:]|Case\b|Multiple\b|Descriptive\b|Subjective\b))',re.I)
@@ -353,7 +365,7 @@ def exact_answer(question,paper,answer_documents):
     return matches
 
 
-def paired_parts(question,answer):
+def paired_parts(question,answer, allow_roman_parts=True):
     """Corroborate printed top-level letter parts in both source regions.
 
     An answer need not contain imperative verbs. Matching sequence, indentation
@@ -376,6 +388,7 @@ def paired_parts(question,answer):
     qrefs=[r for r,_ in qm];arefs=[r for r,_ in am]
     unique=list(dict.fromkeys(qrefs))
     if not qm and not am:
+        if not allow_roman_parts:return [question],[answer],[]
         # Independent roman requirements may share one scenario (for example,
         # journal entries and a consolidated statement). Facts labelled (i)/(ii)
         # cannot qualify unless every question region has an operative request
@@ -427,19 +440,19 @@ def paired_parts(question,answer):
     return questions,answers,[]
 
 
-def practice_parts(question,answer):
+def practice_parts(question,answer, allow_roman_parts=True):
     """Also separate explicitly lettered cases within an Either/Or branch.
 
     Recursion is bounded and requires corroborating answer labels. Shared
     instructions remain linked common context instead of being discarded.
     """
-    questions,answers,warnings=paired_parts(question,answer)
+    questions,answers,warnings=paired_parts(question,answer,allow_roman_parts=allow_roman_parts)
     if warnings:return questions,answers,warnings
     finalq=[];finala=[]
     for q,a in zip(questions,answers):
         if not q['alternative']:
             finalq.append(q);finala.append(a);continue
-        nestedq,nesteda,issues=paired_parts(q,a)
+        nestedq,nesteda,issues=paired_parts(q,a,allow_roman_parts=allow_roman_parts)
         if issues or len(nestedq)==1:
             finalq.append(q);finala.append(a);continue
         for qq,aa in zip(nestedq,nesteda):

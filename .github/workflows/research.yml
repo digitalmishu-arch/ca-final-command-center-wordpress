@@ -40,6 +40,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_mcq_pipeline.py' -v
       - name: Six-subject source identity and section-profile guards
         run: python3 -m unittest discover -s tests -p 'test_archive_pipeline.py' -v
+      - name: AFM source, numbering, layout and exact-key regressions
+        run: python3 -m unittest discover -s tests -p 'test_afm_reconcile.py' -v
+      - name: Complete-problem boundaries and source-scoped solution alternatives
+        run: python3 -m unittest discover -s tests -p 'test_afm_structure.py' -v
       - name: Build public research CODE artifact
         run: python3 scripts/build-research.py
       - uses: actions/upload-artifact@v4
