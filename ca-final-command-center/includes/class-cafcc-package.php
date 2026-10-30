@@ -84,6 +84,28 @@ final class CAFCC_Package {
         if($id){$g=CAFCC_Rights::get($id);if($g['state']==='active')CAFCC_Sources::associate($g);return array('created'=>0,'retained'=>1,'grant_id'=>(int)$id,'note'=>'Existing owner declaration retained. Scope corrections are made in Publication Rights, not overwritten by a package.','state'=>$g['state']);}
         $scope=$p['scope'];$scope['declaration_key']=$p['declaration_key'];$g=CAFCC_Rights::save(0,array('scope'=>$scope,'state'=>'active','confirmed'=>true));if(is_wp_error($g))return $g;return array('created'=>1,'retained'=>0,'grant_id'=>(int)$g['id'],'note'=>'Confirmed source-wide owner attestation; academic records remain unapproved.');
     }
+    /** Reconstruct only an untouched, unprepared draft against its stored r010 input. */
+    public static function reconstruct_untouched($data){
+        if(is_wp_error($e=CAFCC_Studio::admin()))return $e;
+        if(($data['subject_code']??'')!=='AFM'||!is_array($data['previous_corrections']??array()))return array('applied'=>false,'reason'=>'No AFM reconstruction baseline.');
+        $marker=null;foreach($data['previous_corrections']??array() as $c)if(($c['type']??'')==='r011_revision_safe_reconstruction')$marker=$c;
+        if(!$marker)return array('applied'=>false,'reason'=>'No reconstruction baseline supplied.');
+        if(!preg_match('/^AFM-ALL-r010-[A-Za-z0-9-]+$/D',$marker['baseline_child_key']??'')||!preg_match('/^[a-f0-9]{64}$/D',$marker['baseline_archive_sha256']??''))return array('applied'=>false,'reason'=>'Invalid r010 reconstruction baseline.');
+        return CAFCC_Academic::transaction(function()use($data,$marker){
+            global $wpdb;$current=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.CAFCC_Studio::table().' WHERE stable_id=%s FOR UPDATE',$data['stable_id']),ARRAY_A);
+            if(!$current)return array('applied'=>false,'reason'=>'New identity.');
+            if((int)$current['revision']!==1||$current['publication_status']!=='draft'||$current['status']!=='needs_review'||!empty($current['question_id'])||!empty($current['occurrence_id'])||json_decode($current['approvals'],true))return array('applied'=>false,'reason'=>'Existing revision, preparation or approval retained.');
+            $parent=$wpdb->get_row($wpdb->prepare('SELECT id FROM '.self::table()." WHERE package_key='AFM-PAPER2-ALL-ATTEMPTS-r010' AND archive_sha256=%s AND owner_id=%d AND status='completed'",$marker['baseline_archive_sha256'],get_current_user_id()),ARRAY_A);
+            if(!$parent||!$wpdb->get_var($wpdb->prepare('SELECT review_id FROM '.CAFCC_Owner::table('membership').' WHERE package_id=%d AND review_id=%d',$parent['id'],$current['id'])))return array('applied'=>false,'reason'=>'Completed matching r010 membership not found.');
+            $payloads=$wpdb->get_col($wpdb->prepare('SELECT i.payload FROM '.self::items_table().' i JOIN '.self::table()." p ON p.id=i.package_id WHERE p.package_key=%s AND p.owner_id=%d AND p.status='completed' AND i.kind='questions' AND i.status='applied'",$marker['baseline_child_key'],get_current_user_id()));$base=null;
+            foreach($payloads as $p)foreach(json_decode($p,true)['records']??array()as $r)if(($r['stable_id']??'')===$data['stable_id'])$base=$r;
+            if(!$base||($base['subject_code']??'')!=='AFM'||$base['source_hash']!==$data['source_hash'])return array('applied'=>false,'reason'=>'Original r010 source identity not found.');
+            foreach(array('question','answer')as $kind)if(!hash_equals($marker['baseline_'.$kind.'_hash']??'',hash('sha256',$base['rich_content'][$kind]['body_html']??'')))return array('applied'=>false,'reason'=>'Baseline content fingerprint differs.');
+            $base=CAFCC_Studio::clean(self::proposed_taxonomy($base));if(is_wp_error($base)||!hash_equals($current['payload_hash'],hash('sha256',wp_json_encode($base))))return array('applied'=>false,'reason'=>'Current draft differs from its entire stored r010 payload; local changes retained.');
+            $saved=CAFCC_Studio::save((int)$current['id'],array('expected_revision'=>1,'data'=>$data));if(is_wp_error($saved))return array('applied'=>false,'reason'=>$saved->get_error_message());
+            return array('applied'=>true,'id'=>(int)$current['id'],'revision'=>(int)$saved['revision'],'publication_status'=>'draft','academic_approval'=>false);
+        });
+    }
     public static function execute_item($kind,$p){
         if($kind==='collection')return CAFCC_Collection::execute($p);
         if($kind==='mcqs')return CAFCC_MCQ::import($p);
@@ -92,8 +114,8 @@ final class CAFCC_Package {
         if($kind==='rights')return self::declaration($p);
         if($kind==='scenarios'){$preview=CAFCC_Review_Tools::scenario_batch('preview',$p);if(is_wp_error($preview))return $preview;if(!$preview['can_apply'])return array('retained'=>count($p['scenarios']),'conflicts'=>$preview['conflicts'],'note'=>'Existing common-fact corrections retained.');return CAFCC_Review_Tools::scenario_batch('apply',array('token'=>$preview['token']));}
         if($kind==='questions'){
-            if(array_diff(array_keys($p),array('batch_key','records'))||!is_array($p['records']??null))return CAFCC_Repository::error('Invalid question batch.');$p['records']=array_map(array(__CLASS__,'proposed_taxonomy'),$p['records']);$p['skip_existing']=true;$preview=CAFCC_Studio::import_preview($p);if(is_wp_error($preview))return $preview;if(!$preview['can_apply'])return CAFCC_Repository::error('Question batch validation: '.wp_json_encode($preview['errors']));$result=CAFCC_Studio::import_apply($preview['token']);if(is_wp_error($result))return $result;
-            $result['retained_corrections']=count($preview['retained_existing']);$result['conflicts']=array_map(function($r){return array('review_id'=>$r['id'],'stable_id'=>$r['record']['stable_id'],'message'=>'Existing correction retained; use Studio comparison if reconstruction is needed.');},$preview['conflict_records']);return $result;
+            if(array_diff(array_keys($p),array('batch_key','records'))||!is_array($p['records']??null))return CAFCC_Repository::error('Invalid question batch.');$p['records']=array_map(array(__CLASS__,'proposed_taxonomy'),$p['records']);$reconstructed=0;foreach($p['records']as $record){$update=self::reconstruct_untouched($record);if(is_wp_error($update))return $update;$reconstructed+=!empty($update['applied']);}$p['skip_existing']=true;$preview=CAFCC_Studio::import_preview($p);if(is_wp_error($preview))return $preview;if(!$preview['can_apply'])return CAFCC_Repository::error('Question batch validation: '.wp_json_encode($preview['errors']));$result=CAFCC_Studio::import_apply($preview['token']);if(is_wp_error($result))return $result;
+            $result['reconstructed_untouched_r010']=$reconstructed;$result['retained_corrections']=count($preview['retained_existing']);$result['conflicts']=array_map(function($r){return array('review_id'=>$r['id'],'stable_id'=>$r['record']['stable_id'],'message'=>'Existing correction retained; use Studio comparison if reconstruction is needed.');},$preview['conflict_records']);return $result;
         }
         return CAFCC_Repository::error('Unsupported package item.');
     }
