@@ -262,4 +262,5 @@ require __DIR__ . "/v07.php";
 require __DIR__ . "/v08.php";
 require __DIR__ . "/v081.php";
 require __DIR__ . "/v082.php";
+require __DIR__ . "/v084.php";
 echo "\n$count integration assertions passed on WordPress " . get_bloginfo('version') . ', PHP ' . PHP_VERSION . ".\n";
