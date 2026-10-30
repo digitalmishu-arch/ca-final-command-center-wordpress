@@ -9,7 +9,7 @@ version 11, or change student pages. The original r011 ZIP remains unchanged.
 The delivered r011 collection contains 1,130 distinct subjective candidates.
 All contain question HTML, ICAI attribution and a matching source-register hash.
 Its completed disposable import has 1,130 subjective memberships. The owner's
-940-record selection is 190 fewer. Its exact cause cannot be established from
+940-record selection is 190 fewer. Changing Package now explicitly selects the package dataset, preventing the old Current scope from silently overriding that choice. This is a plausible filter cause, not a proven diagnosis of staging. Its exact cause cannot be established from
 four aggregate counts or from a different disposable database.
 
 1. Back up staging and replace the application plugin with 0.8.4. Do not uninstall.
