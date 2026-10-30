@@ -23,6 +23,10 @@ class CompleteProblemTests(unittest.TestCase):
   qs=[dict(subreference=x,alternative='')for x in 'ab'];a=region([line('3. (a) Original complete solution.',72,100),line('Some workings.',150,130),line('(b) Separate second solution.',108,170)],'answer');ans,w=structure.answer_parts(qs,a);self.assertEqual([x['subreference']for x in ans],['a','b']);self.assertEqual(w,[])
  def test_missing_alternative_does_not_erase_unambiguous_answer_a(self):
   qs=[dict(subreference='a',alternative=''),dict(subreference='b',alternative='either'),dict(subreference='b',alternative='or')];a=region([line('(a) Exact first part.'),line('(b) Ambiguous alternative solution.',108,170)],'answer');ans,w=structure.answer_parts(qs,a);self.assertEqual([x['subreference']for x in ans],['a']);self.assertTrue(w)
+ def test_substantive_letter_restart_at_shifted_margin_is_flagged(self):
+  q=region([line('(b)',126,100),line('First scenario table continuation.',148,130),line('(b) Original Other Ltd begins a different financing problem.',108,220)]);issues=structure.boundary_conflicts(q);self.assertEqual(len(issues),1);self.assertEqual(issues[0]['printed_part'],'b')
+ def test_gdr_requirement_has_its_own_editorial_finance_concept(self):
+  q=region([line('Compute the number of GDRs and their financing cost.')]);a=region([line('The GDRs have a fixture financing cost.')],'answer');tags=afm.tags(q,a);self.assertTrue(any(t['chapter']==11 and 'Depository receipts'in t['label']for t in tags));self.assertTrue(all(t['origin']=='editorial'for t in tags))
  def test_out_of_order_working_labels_are_not_silently_assigned(self):
   qs=[dict(subreference=x,alternative='')for x in 'ab'];a=region([line('(a) First part.'),line('(b) Next part.',108,150),line('(a) Unexpected reused main-margin label.',108,200)],'answer');ans,w=structure.answer_parts(qs,a);self.assertEqual(ans,[]);self.assertTrue(w)
 if __name__=='__main__':unittest.main()

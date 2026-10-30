@@ -56,7 +56,13 @@ def audit(bank_path,profiles,baseline,decisions,output):
     for (fid,ref),previous in groups.items():
         parent=next(x['region']for x in profile(fid)['records']if x['region']['side']=='question'and x['region']['reference']==ref and x['region']['format']=='SUBJECTIVE');parent={**parent,'source_type':source[fid]['identity']['source_type']};afid=previous[0]['answer_file_id'];answers=[x['region']for x in profile(afid)['records']if x['region']['side']=='answer'and x['region']['reference']==ref and x['region']['format']=='SUBJECTIVE']if afid else[];pa=answers[0]if len(answers)==1 else None
         qs,ans,issues=structure.complete_parts(parent,pa)
-        keep=keeps.get(fid+'|'+ref,[])
+        config=keeps.get(fid+'|'+ref,[]);config={'keep_independent_parts':config}if isinstance(config,list)else config;keep=config.get('keep_independent_parts',[])
+        if config.get('question_start_indices'):
+            assert config['expected_source_sha256']==source[fid]['source_hash'],'Source-specific decision cannot apply to a revised PDF'
+            starts=config['question_start_indices'];qs=[]
+            for n,at in enumerate(starts):
+                stop=starts[n+1]if n+1<len(starts)else len(parent['lines']);body=parent['lines'][at:stop];qs.append({**parent,'subreference':config['question_subreferences'][n],'alternative':'','lines':body,'shared_lines':[],'start':fr.where(body[0]),'end_exclusive':fr.where(parent['lines'][stop])if stop<len(parent['lines'])else parent['end_exclusive']})
+            ans,answer_issues=structure.answer_parts(qs,pa);issues=answer_issues
         if keep:
             legacy_q,legacy_a,_=afm.split_question(parent,pa,split_nested_requirements=True)
             for prefix in keep:
@@ -68,9 +74,11 @@ def audit(bank_path,profiles,baseline,decisions,output):
         amap={(a.get('subreference',''),a.get('alternative','')):a for a in ans};targets=[]
         for q in qs:
             sub=prior.subref(q);alt=q.get('alternative','');exact=next((x for x in previous if key(x['import_record'])==(ref,sub,alt)),None)
-            inputs=[exact]if exact else[x for x in previous if x['import_record']['practice_structure'].get('alternative','')==alt and (not sub or x['import_record']['subreference'].startswith(sub+'('))]
-            if not inputs:inputs=previous # retained as uncertain, never mapped to an unrelated source
-            template=deepcopy(exact or inputs[0]);r=deepcopy(original[(exact or inputs[0])['import_record']['stable_id']]);old_id=r['stable_id']
+            overrides=config.get('old_target_overrides',{})
+            if overrides:inputs=[x for x in previous if overrides.get(x['import_record']['subreference'],x['import_record']['subreference'])==sub]
+            else:inputs=[exact]if exact else[x for x in previous if x['import_record']['practice_structure'].get('alternative','')==alt and (not sub or x['import_record']['subreference'].startswith(sub+'('))]
+            if not inputs and not overrides:inputs=previous # held if no source-supported finer correspondence
+            template=deepcopy(exact or(inputs or previous)[0]);r=deepcopy(original[(exact or(inputs or previous)[0])['import_record']['stable_id']]);old_id=r['stable_id']
             sid=old_id if exact else'R-'+layout_engine.identity(r['source_hash'],'descriptive'+(':'+alt if alt else''),ref,q.get('subreference','')+(':'+alt if alt else''))
             a=amap.get((q.get('subreference',''),alt));answer_region=a
             if a and a.get('shared_lines'):answer_region={**a,'lines':a['shared_lines']+a['lines'],'start':fr.where(a['shared_lines'][0])}
@@ -80,6 +88,9 @@ def audit(bank_path,profiles,baseline,decisions,output):
             # corrigenda, source identity and historical holds survive the merge.
             inherited=[w for x in inputs for w in x['import_record']['blocking_exceptions']]
             warnings=[w for w in inherited if not re.search(r'^answer_mapping_conflict_state_|^answer_parent_part_profile_requires_review$',w)]
+            if config.get('printed_label_conflict'):warnings.append('question_integrity_failed_printed_label_conflict_requires_owner_confirmation')
+            boundary_evidence=structure.boundary_conflicts(q)
+            if boundary_evidence:warnings.append('question_integrity_failed_unresolved_main_part_restart_or_margin_shift')
             if state=='B':warnings.append('answer_mapping_conflict_limited_content_corroboration_source_part_matches')
             if state in('C','D'):warnings.append('answer_mapping_conflict_'+('exact_parent_part_unresolved'if state=='C'else'source_answer_unavailable'))
             if any(w.startswith('question_boundary')for w in issues):warnings.append('question_integrity_failed_source_part_boundary_requires_review')
@@ -98,13 +109,27 @@ def audit(bank_path,profiles,baseline,decisions,output):
             if answer:
                 r['rich_content']['answer']=prior.content(answer);r['answer']=dict(source_hash=source[afid]['source_hash'],official_url='https://drive.google.com/file/d/'+afid+'/view',reference=ref,subreference=sub,alternative=alt,question_identity=sid,question_reference=ref,question_subreference=sub,question_source_hash=r['source_hash'],page=str(prior.page(a)),subject_code='AFM',source_type=r['source_type'],exam_attempt=r['exam_attempt'],mtp_series=r['mtp_series'],mode='licensed',notes='r011 '+state+': exact source-context and complete-problem answer region; automated/AI-assisted source comparison, not independent human academic verification.')
             marks=re.findall(r'\((\d{1,2})\s*Marks?\)',body['plain_text'],re.I);r['marks']=int(marks[-1])if len(set(marks))==1 else None;r['marks_verified']=r['marks']is not None
-            row=dict(import_record=r,question=body,answer=answer,answer_candidate=deepcopy(template.get('answer_candidate'))if not answer else None,answer_candidate_page=template.get('answer_candidate_page','')if not answer else'',source_file_id=fid,answer_file_id=afid,match_state=state,match_evidence={**evidence,'question_region':structure.span_evidence(q),'answer_region':structure.span_evidence(a),'source_hash':r['source_hash'],'answer_hash':source[afid]['source_hash']if afid else'', 'source_context_fields':{k:r[k]for k in('subject_code','source_type','exam_attempt','mtp_series','issue_period','scheme')},'human_academic_approval':False},proposed_topics=deepcopy(template['proposed_topics']),original_subject=template['original_subject'],source_filename=template['source_filename'],import_eligible=True)
+            proposed=afm.tags(checkq,answer_region)if not exact else deepcopy(template['proposed_topics'])
+            if not exact and proposed:
+                edition=r['ai_proposal']['historical_edition'];tax=next((v for k,v in bank['taxonomies'].items()if k==edition or(k[:63]+'-'+gold.sha(k)[:16]if len(k)>80 else k)==edition),None)
+                if tax:
+                    rawedition=tax['editions'][0]['edition_key']
+                    for proposal in proposed:
+                        nk=rawedition+'-chapter-'+str(proposal['chapter'])+'-'+afm.slug(proposal['label'])
+                        if not any(n['node_key']==nk for n in tax['nodes']):tax['nodes'].append(dict(node_key=nk,edition_key=rawedition,subject_code='AFM',parent_key=rawedition+'-chapter-'+str(proposal['chapter']),node_type='topic',title=proposal['label'],heading_origin='editorial',source_url=tax['editions'][0]['source_url'],source_location='Provisional complete-problem operative requirement and source-solution evidence; not an exact official subheading.'))
+                paths=[n for p in proposed for n in(tax or{}).get('nodes',[])if n['title']==p['label']and '-chapter-'+str(p['chapter'])+'-'in n['node_key']]
+                if paths:r['ai_proposal']['primary_path']=[dict(node_key=paths[0]['node_key'],node_type='topic',title=paths[0]['title'])];r['ai_proposal']['additional_node_keys']=[p['node_key']for p in paths[1:]]
+                r['ai_proposal']['proposed_search_tags']=[p['label']for p in proposed]
+                r['blocking_exceptions']=[w for w in r['blocking_exceptions']if w!='TOPIC_REVIEW_REQUIRED']
+            elif not exact:
+                r['ai_proposal']['primary_path']=[dict(node_key=r['ai_proposal']['historical_edition']+'-topic-review',node_type='chapter',title='Topic Review Required (Editorial)')];r['ai_proposal']['additional_node_keys']=[];r['ai_proposal']['proposed_search_tags']=[];r['blocking_exceptions'].append('TOPIC_REVIEW_REQUIRED')
+            row=dict(import_record=r,question=body,answer=answer,answer_candidate=deepcopy(template.get('answer_candidate'))if not answer else None,answer_candidate_page=template.get('answer_candidate_page','')if not answer else'',source_file_id=fid,answer_file_id=afid,match_state=state,match_evidence={**evidence,'question_region':structure.span_evidence(q),'answer_region':structure.span_evidence(a),'source_hash':r['source_hash'],'answer_hash':source[afid]['source_hash']if afid else'', 'source_context_fields':{k:r[k]for k in('subject_code','source_type','exam_attempt','mtp_series','issue_period','scheme')},'human_academic_approval':False,'boundary_evidence':boundary_evidence,'source_specific_decision':config},proposed_topics=proposed,original_subject=template['original_subject'],source_filename=template['source_filename'],import_eligible=True)
             archive_integrity.hold(row)
             if exact:
                 # Preserve exact unchanged import payloads, rather than create
                 # gratuitous revision conflicts in otherwise untouched records.
                 oldr=original[old_id];same_content=all(oldr.get('rich_content',{}).get(k,{}).get('body_html')==r.get('rich_content',{}).get(k,{}).get('body_html')for k in('question','answer'))and oldr.get('practice_structure',{}).get('scenario_key')==r['practice_structure'].get('scenario_key')
-                if same_content and exact['match_state']=='A'and not issues:r=deepcopy(oldr);row['import_record']=r
+                if same_content and exact['match_state']=='A'and not issues and not boundary_evidence and not config.get('printed_label_conflict'):r=deepcopy(oldr);row['import_record']=r
             row['import_record']['blocking_exceptions']=sorted(set(row['import_record']['blocking_exceptions']))
             new.append(row);targets.append((row,q,a,inputs))
             changed=not exact or original[old_id].get('rich_content')!=r.get('rich_content')
@@ -122,6 +147,10 @@ def audit(bank_path,profiles,baseline,decisions,output):
             if before['match_state']in('B','C'):
                 outcome='parent_requirement_granularity_resolved'if grouped and row['match_state']=='A'else'same_source_answer_warning_reclassified'if not grouped and row['match_state']=='A'else'remains_unresolved'
                 ledger.append(dict(old_id=br['stable_id'],new_id=nr['stable_id'],old_state=before['match_state'],new_state=row['match_state'],outcome=outcome,confirmed_wrong_answer=False,source_file_id=fid,answer_file_id=afid,question_region=structure.span_evidence(q),answer_region=structure.span_evidence(a),evidence=row['match_evidence'],question_text_preview=row['question']['plain_text'][:650],answer_text_preview=(row.get('answer')or{}).get('plain_text','')[:650],comparison='Source PDF native lines and layout coordinates compared; not independent human academic approval'))
+        if config.get('related_recovered_subreferences'):
+            for link in mapping:
+                if link['old_id']in[x['import_record']['stable_id']for x in previous]and link['old_subreference']in config['related_recovered_subreferences']:
+                    link['related_new_ids']=[t[0]['import_record']['stable_id']for t in targets];link['note']='Old extraction crossed two complete source problems. The primary map is a review proposal; retain old activity on the old ID and never assign it automatically to either new problem.'
         parent_audit.append(dict(source_file_id=fid,reference=ref,question_source_hash=source[fid]['source_hash'],old_entries=len(previous),new_entries=len(qs),kept_independent_roman_parts=keep,issues=issues,question_source_pages=sorted({l['page']for l in parent['lines']}),answer_source_pages=sorted({l['page']for l in(pa or{}).get('lines',[])})))
         print(json.dumps(dict(file_id=fid,reference=ref,old=len(previous),new=len(qs),completed_parents=len(parent_audit))),flush=True)
     for d in documents.values():d.close()
@@ -139,7 +168,7 @@ def audit(bank_path,profiles,baseline,decisions,output):
     for row in new:per[row['source_file_id']].append(row)
     for c in bank['coverage']:
         rs=per[c['file_id']];c.update(subjective_parts=len(rs),source_corroborated_answers=sum(x['match_state']=='A'for x in rs),answer_candidates=sum(x['match_state']=='B'for x in rs),answer_pending=sum(x['match_state']in('C','D','E')for x in rs),blocked_questions=sum(any('question_integrity_failed'in w for w in x['import_record']['blocking_exceptions'])for x in rs),import_subjective=len(rs))
-    summary=dict(baseline_subjective=1255,revised_subjective=len(new),parents_audited=len(parent_audit),old_warnings_audited=len(ledger),old_warning_outcomes=dict(Counter(x['outcome']for x in ledger)),confirmed_wrong_answer_associations=0,answer_states=dict(Counter(x['match_state']for x in new)),old_entries_combined=sum(x['action'].startswith('combined')for x in mapping),retained_original_ids=sum(x['action']=='identity_retained'for x in mapping),new_complete_problem_ids=len({x['new_id']for x in mapping if x['action'].startswith('combined')}),material_changes=len(material),changed_tables=len(changed_tables),native_regions_reconstructed=reconstructed,official_no_correct_option_mcqs=len(nco),duplicated_r010_no_correct_option_flags=2,question_integrity_holds=sum(any('question_integrity_failed'in w for w in x['import_record']['blocking_exceptions'])for x in new),table_formula_issue_records=sum(any(re.search('table|formula|glyph|numeric|geometry|font',w,re.I)for w in x['import_record']['blocking_exceptions'])for x in new),owner_academic_approvals=0,publications=0)
+    summary=dict(baseline_subjective=1255,revised_subjective=len(new),parents_audited=len(parent_audit),old_warnings_audited=len(ledger),old_warning_outcomes=dict(Counter(x['outcome']for x in ledger)),confirmed_wrong_answer_associations=0,answer_states=dict(Counter(x['match_state']for x in new)),old_entries_combined=sum(x['action'].startswith('combined')for x in mapping),retained_original_ids=sum(x['action']=='identity_retained'for x in mapping),new_complete_problem_ids=len({x['import_record']['stable_id']for x in new}-set(original)),new_problem_identities_not_primary_mapping_targets=sorted({x['import_record']['stable_id']for x in new}-{x['new_id']for x in mapping}),material_changes=len(material),changed_tables=len(changed_tables),native_regions_reconstructed=reconstructed,official_no_correct_option_mcqs=len(nco),duplicated_r010_no_correct_option_flags=2,question_integrity_holds=sum(any('question_integrity_failed'in w for w in x['import_record']['blocking_exceptions'])for x in new),table_formula_issue_records=sum(any(re.search('table|formula|glyph|numeric|geometry|font',w,re.I)for w in x['import_record']['blocking_exceptions'])for x in new),owner_academic_approvals=0,publications=0)
     for name,obj in [('bank-r011.json',bank),('answer-warning-audit.json',ledger),('old-to-new-identities.json',mapping),('material-changes.json',material),('changed-tables.json',changed_tables),('complete-parent-audit.json',parent_audit),('official-no-correct-option.json',nco),('summary.json',summary)]:
         if name=='bank-r011.json':(out/name).write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')))
         else:cat.write(out/name,obj)

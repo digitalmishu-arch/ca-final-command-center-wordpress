@@ -69,3 +69,19 @@ def complete_parts(question,answer):
 def span_evidence(region):
     if not region:return None
     return dict(reference=region['reference'],subreference=region.get('subreference',''),alternative=region.get('alternative',''),start=region['start'],end_exclusive=region['end_exclusive'],lines=len(region['lines']),printed_requirement_labels=[l['text'][:150]for l in region['lines']if re.match(r'^\([ivx]+\)',l['text'],re.I)],marks=[l['text']for l in region['lines']if re.search(r'\bMarks?\b',l['text'],re.I)])
+
+
+def boundary_conflicts(question):
+    """Flag substantive main-part restarts missed by one fixed margin.
+
+    A source-specific printing/geometry decision is still required; this guard
+    never moves an unknown scenario into a different question automatically.
+    """
+    first=question['start']['bbox'][0];issues=[]
+    for i,l in enumerate(question['lines']):
+        if i==0:continue
+        m=PART.match(l['text'])
+        if not m or l['bbox'][0]>first+4:continue
+        rest=l['text'][m.end():].strip()
+        if len(rest)>35 and re.search(r'\b(?:Ltd|Limited|Inc|Corporation|company|Mr|Mrs)\b',rest,re.I):issues.append(dict(code='possible_main_part_restart',page=l['page'],bbox=l['bbox'],printed_part=m[1],excerpt=l['text'][:180]))
+    return issues

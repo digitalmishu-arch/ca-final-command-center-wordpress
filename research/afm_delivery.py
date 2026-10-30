@@ -92,10 +92,11 @@ def workbook(path,bank,details):
             if kind=='subjective'and row['match_state']in('B','C','E'):destinations.append('Answer Matching Issues')
             if kind=='subjective'and row['match_state']=='D'or kind=='mcq'and not r.get('key_verified')and not r.get('answer',{}).get('key_evidence'):destinations.append('Missing Answers')
             if kind=='mcq'and not r.get('key_verified')and r.get('answer',{}).get('key_evidence')and not r['answer']['key_evidence'].get('no_correct_option'):destinations.append('Answer Matching Issues')
-            if any(re.search('boundary|part_sequence|alternative_identity|number_sequence',x,re.I)for x in issues):destinations.append('Question Boundary Issues')
+            if any(re.search('boundary|part_sequence|alternative_identity|number_sequence|printed_label|margin_shift|part_restart|duplicate_printed_question_number',x,re.I)for x in issues):destinations.append('Question Boundary Issues')
             if any(re.search('table|formula|glyph|numeric|geometry|font',x,re.I)for x in issues):destinations.append('Tables Formula Issues')
             if any(re.search('TOPIC_REVIEW|historical|syllabus',x,re.I)for x in issues):destinations.append('Topic Syllabus Mapping Issues')
             if any(re.search('source_identity|target_attempt',x,re.I)for x in issues):destinations.append('Source PDF Identity Issues')
+            if any('duplicate_printed_question_number'in x for x in issues):destinations.append('Duplicate Repeated Questions')
             for name in set(destinations):sheets[name].append(cells)
             for issue in issues:
                 group=re.sub(r'_page_\d+','_page_N',issue);patterns[group].append(sid)
@@ -131,7 +132,10 @@ def workbook(path,bank,details):
             idx=col[0].column;sheet.column_dimensions[col[0].column_letter].width=48 if idx in(9,10,19)else 28 if idx in(1,7,14,15,21,22,23,24)else 19
         if sheet.title not in('Source Coverage Summary','Pattern Groups'):
             dv=DataValidation(type='list',formula1='"Needs Review,Publish,Reject,Hold"');sheet.add_data_validation(dv);dv.add('U2:U'+str(max(2,sheet.max_row)))
-    wb.save(path)
+    # Lossless compression keeps the complete private workbook within the
+    # existing collection limit; no text, cells or evidence are truncated.
+    from openpyxl.writer.excel import ExcelWriter
+    with zipfile.ZipFile(path,'w',zipfile.ZIP_DEFLATED,compresslevel=9)as archive:ExcelWriter(wb,archive).save()
 
 def build(bank_path,output,revision,evidence=None):
     bank=json.loads(Path(bank_path).read_text());key_mapping=bounded_taxonomy(bank);out=cat.private(output);out.mkdir(parents=True,exist_ok=True);base=out/'AFM';base.mkdir(exist_ok=True);details={};import_order=[]

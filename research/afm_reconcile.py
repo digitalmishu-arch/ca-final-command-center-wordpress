@@ -35,6 +35,7 @@ CONCEPTS = [
  (9,'Options valuation and strategies',r'call option|put option|black.scholes|binomial|option premium|straddle|strangle'),
  (9,'Futures and arbitrage',r'futures? price|futures? contract|cost of carry'),
  (10,'Foreign exchange hedging',r'forward contract|forward exchange|money market hedge|exchange exposure|NOSTRO|VOSTRO|cross.currency'),
+ (11,'Depository receipts and overseas capital raising',r'\bGDRs?\b|\bADRs?\b|depositor[y] receipts'),
  (11,'International financial management',r'multilateral netting|international capital budgeting|foreign direct investment|political risk|overseas|subsidiar.{0,90}(?:France|Germany|currency)'),
  (12,'Interest rate derivatives',r'interest rate swap|forward rate agreement|\bFRA\b|interest rate cap|interest rate collar|floating rate loan'),
  (3,'Discounted cash flow and investment decisions',r'net present value|\bNPV\b|\bIRR\b|capital budgeting|replacement.{0,30}machine|cost of capital.{0,60}project'),
