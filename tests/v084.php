@@ -16,3 +16,5 @@ $empty_review=CAFCC_Studio::get($diagnostic_id);$empty_review['data']['rich_cont
 check(in_array('Complete question text is missing.',$empty_quality['blocks'],true),'Empty question still blocks publication');
 check(!in_array('Question HTML contains an invalid table structure.',$empty_quality['blocks'],true)&&!in_array('Question contains a restricted private reference.',$empty_quality['blocks'],true),'Missing content does not fabricate table corruption or private-link diagnoses');
 $private_review=$empty_review;$private_review['data']['rich_content']['question']=array('body_html'=>'<p>Private https://drive.google.com/file/d/restricted/view</p>','author_name'=>'Original authored fixture');check(in_array('Question contains a restricted private reference.',CAFCC_Owner::quality($private_review)['blocks'],true),'Actual private references remain blocked');
+
+$current_diagnostic_job=mcq_ok(CAFCC_Owner::plan(array('scope'=>'current'),'publish'));check($current_diagnostic_job['selection']['resolved_package_id']===(int)get_option('cafcc_current_package',0),'Current dataset preview freezes its resolved package identity for diagnostics');
