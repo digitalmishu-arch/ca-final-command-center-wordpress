@@ -6,7 +6,8 @@ established Academic Package v1 format. Never approves or publishes records.
 from collections import Counter,defaultdict
 from copy import deepcopy
 from pathlib import Path
-import argparse,html,json,re,zipfile,shutil,posixpath
+import argparse,html,json,re,zipfile,shutil,posixpath,io
+import xml.etree.ElementTree as ET
 from datetime import datetime,timezone
 from openpyxl import Workbook
 from openpyxl.styles import Font,PatternFill,Alignment,Protection
@@ -21,6 +22,37 @@ MCQ_KEYS='stable_id source_occurrence_id subject_code source_type exam_attempt m
 def raw(obj):return (json.dumps(obj,ensure_ascii=False,separators=(',',':'))+'\n').encode()
 def plain(s):return html.unescape(re.sub('<[^>]+>',' ',s or''))
 def safe(s):return afm.slug(str(s))or'not-established'
+def compact_xlsx(path):
+    """Losslessly reuse identical strings across the review sheets."""
+    ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+    rel='http://schemas.openxmlformats.org/package/2006/relationships'
+    ct='http://schemas.openxmlformats.org/package/2006/content-types'
+    ET.register_namespace('',ns)
+    with zipfile.ZipFile(path)as z:files={n:z.read(n)for n in z.namelist()}
+    if 'xl/sharedStrings.xml'in files:return
+    unique={};strings=[];count=0
+    for name,raw_xml in list(files.items()):
+        if not re.fullmatch(r'xl/worksheets/sheet\d+\.xml',name):continue
+        sheet=ET.fromstring(raw_xml)
+        for cell in sheet.iter('{'+ns+'}c'):
+            if cell.get('t')!='inlineStr':continue
+            inline=cell.find('{'+ns+'}is')
+            if inline is None:continue
+            key=ET.tostring(inline,encoding='utf-8');count+=1
+            if key not in unique:
+                unique[key]=len(strings);entry=deepcopy(inline);entry.tag='{'+ns+'}si';strings.append(entry)
+            cell.remove(inline);cell.set('t','s');ET.SubElement(cell,'{'+ns+'}v').text=str(unique[key])
+        files[name]=ET.tostring(sheet,encoding='utf-8',xml_declaration=True)
+    sst=ET.Element('{'+ns+'}sst',count=str(count),uniqueCount=str(len(strings)));sst.extend(strings)
+    files['xl/sharedStrings.xml']=ET.tostring(sst,encoding='utf-8',xml_declaration=True)
+    types=ET.fromstring(files['[Content_Types].xml']);ET.SubElement(types,'{'+ct+'}Override',PartName='/xl/sharedStrings.xml',ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml');files['[Content_Types].xml']=ET.tostring(types,encoding='utf-8',xml_declaration=True)
+    relations=ET.fromstring(files['xl/_rels/workbook.xml.rels']);ids={r.get('Id')for r in relations};rid='rIdSharedStrings'
+    while rid in ids:rid+='X'
+    ET.SubElement(relations,'{'+rel+'}Relationship',Id=rid,Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings',Target='sharedStrings.xml');files['xl/_rels/workbook.xml.rels']=ET.tostring(relations,encoding='utf-8',xml_declaration=True)
+    output=io.BytesIO()
+    with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED,compresslevel=9)as z:
+        for name,data in files.items():z.writestr(name,data)
+    path.write_bytes(output.getvalue())
 def bounded_taxonomy(bank):
     """Fit the established 120-character key schema without changing titles."""
     mapping={};editions={key:key[:63]+'-'+gold.sha(key)[:16]for key in bank['taxonomies']if len(key)>80}
@@ -118,6 +150,14 @@ def workbook(path,bank,details):
             qr=row.get('question_region')or{};ar=row.get('answer_region')or{};s.append([row['old_id'],row['new_id'],row['old_state'],row['new_state'],row['outcome'],'https://drive.google.com/file/d/'+row['source_file_id']+'/view','https://drive.google.com/file/d/'+row['answer_file_id']+'/view',qr.get('start',{}).get('page',''),ar.get('start',{}).get('page',''),json.dumps(row['evidence'],ensure_ascii=False),''])
         s=wb.create_sheet('Structure ID Reconciliation');s.append(['Old Question ID','r011 Question ID','Action','Original Part','r011 Part','Related New IDs / Split Evidence','Student Activity Policy','Existing Edit Policy','Owner Decision'])
         for row in bank['r011_reconciliation']:s.append([row['old_id'],row['new_id'],row['action'],row['old_subreference'],row['new_subreference'],', '.join(row.get('related_new_ids',[]))+' '+row.get('note',''),row['student_history'],row['existing_edit_policy'],''])
+    if bank.get('publication_audit'):
+        audit=bank['publication_audit'];s=wb.create_sheet('Publication Blockers');s.append(['Question ID','Source PDF','Type','Attempt','Series','Question','Question Page','PDF URL','Blocking Reason','Proposed Correction','Status','Owner Decision'])
+        a=wb.create_sheet('Answer HTML Issues');a.append(['Question ID','Source PDF','Attempt','Question','Answer Page','Answer PDF','Issue','Action','Status','Owner Decision'])
+        for row in audit['records']:
+            ref=row['reference']+('('+row['subreference']+')'if row['subreference']else'')
+            for issue in row['blocks']:s.append([row['question_id'],row['source_filename'],row['source_type'],row['attempt'],row['series'],ref,row['question_page'],row['source_url'],issue,row['proposed_corrections'][issue],'Needs Review',''])
+            if not row['answer_html_integrity']:a.append([row['question_id'],row['source_filename'],row['attempt'],ref,row['answer_page'],'https://drive.google.com/file/d/'+row['answer_source_file_id']+'/view'if row['answer_source_file_id']else'',row['answer_html_issue'],row['answer_correction'],'Needs Review',''])
+        s=wb.create_sheet('Staging Selection');s.append(['Observation','Value','Evidence / Limitation']);reported=audit.get('reported_selected_count');expected=audit.get('expected_dataset_count',len(bank['subjective']));s.append(['Owner-reported selected records',reported,'Private diagnostic input; staging not accessed']);s.append(['Expected subjective membership',expected,'Derived from the supplied private dataset']);s.append(['Difference requiring reconciliation',expected-reported if isinstance(reported,int)else None,'Cause remains unknown until saved-selection diagnostic export is supplied']);s.append(['Disposable technically eligible',audit['eligible'],'Conditional labelled QA rights fixture; no owner academic approval']);s.append(['Disposable blocked',audit['blocked'],'Material holds retained']);s.append(['Warning-bearing eligible records',audit['warnings_eligible'],'Not comparable to staging subset until selection is reconciled'])
     for sheet in wb:
         sheet.freeze_panes='B2';sheet.auto_filter.ref=sheet.dimensions;sheet.sheet_view.zoomScale=85
         for cell in sheet[1]:cell.font=Font(bold=True,color='FFFFFF');cell.fill=PatternFill('solid',fgColor='173E53');cell.alignment=Alignment(wrap_text=True,vertical='top')
@@ -136,6 +176,7 @@ def workbook(path,bank,details):
     # existing collection limit; no text, cells or evidence are truncated.
     from openpyxl.writer.excel import ExcelWriter
     with zipfile.ZipFile(path,'w',zipfile.ZIP_DEFLATED,compresslevel=9)as archive:ExcelWriter(wb,archive).save()
+    compact_xlsx(path)
 
 def build(bank_path,output,revision,evidence=None):
     bank=json.loads(Path(bank_path).read_text());key_mapping=bounded_taxonomy(bank);out=cat.private(output);out.mkdir(parents=True,exist_ok=True);base=out/'AFM';base.mkdir(exist_ok=True);details={};import_order=[]
@@ -186,7 +227,7 @@ def build(bank_path,output,revision,evidence=None):
     assert len(import_order)<=100,len(import_order)
     summary=dict(source_file_copies=len(bank['source_inventory']),unique_pdf_sha256=len({s['source_hash']for s in bank['source_inventory']}),native_content_copies=len(bank['source_copies']),subjective_candidates=len(bank['subjective']),mcq_candidates=len(bank['mcqs']),subjective_draft_imports=sum(x['records']for x in import_order if x['kind']=='questions'),mcq_draft_imports=sum(x['records']for x in import_order if x['kind']=='mcqs'),answer_matching=dict(Counter(x['match_state']for x in bank['subjective'])),child_packages=len(import_order),academic_approvals=0,publications=0)
     cat.write(base/'coverage-reports/summary.json',summary);cat.write(base/'import-order.json',import_order)
-    (base/'READ-FIRST.txt').write_text('AFM/SFM PRIVATE REVIEW AND IMPORT — '+revision+'\n\nInstall the reviewed v0.8.3 application patch first. Upload this entire outer ZIP once through Upload Questions → Preview → Save as Drafts. It is a draft-only subject collection, not a WordPress plugin. It contains bounded existing Academic Package v1 children. Interrupted imports resume their checkpoints; reimport does not overwrite existing corrections. No question, MCQ or rights grant is automatically published.\n\nTo read the workbook on iPad: download this ZIP to Files, Uncompress, open AFM/academic-review/AFM-Owner-Review.xlsx in Excel or Numbers. Full selectable HTML is in the matching source/year/attempt folders. Issue sheets contain actual flags only. The large workbook is a research overview, not an automatic approval importer; use current WordPress decision exports after import for revision-safe decisions.\n\nHistorical SFM keeps its true paper identity. Current AFM crosswalks and detailed search concepts are editorial proposals. Unknown MTP targets are explicitly labelled as issue periods with target pending; they are not invented examination attempts. Source-corroborated matching is automated evidence, not independent academic verification. All real decisions are Needs Review.\n\nThe original January FR pilot and the other five subjects are not part of this import. Do not uninstall or reset the plugin.\n')
+    (base/'READ-FIRST.txt').write_text('AFM/SFM PRIVATE REVIEW AND IMPORT — '+revision+'\n\nInstall the reviewed v0.8.4 application patch first. Upload this entire outer ZIP once through Upload Questions → Preview → Save as Drafts. It is a draft-only subject collection, not a WordPress plugin. It contains bounded existing Academic Package v1 children. Interrupted imports resume their checkpoints; reimport does not overwrite existing corrections. No question, MCQ or rights grant is automatically published.\n\nTo read the workbook on iPad: download this ZIP to Files, Uncompress, open AFM/academic-review/AFM-Owner-Review.xlsx in Excel or Numbers. Full selectable HTML is in the matching source/year/attempt folders. Issue sheets contain actual flags only. The large workbook is a research overview, not an automatic approval importer; use current WordPress decision exports after import for revision-safe decisions.\n\nHistorical SFM keeps its true paper identity. Current AFM crosswalks and detailed search concepts are editorial proposals. Unknown MTP targets are explicitly labelled as issue periods with target pending; they are not invented examination attempts. Source-corroborated matching is automated evidence, not independent academic verification. All real decisions are Needs Review.\n\nThe original January FR pilot and the other five subjects are not part of this import. Do not uninstall or reset the plugin.\n')
     if bank.get('r011_reconciliation'):
         with (base/'READ-FIRST.txt').open('a')as guide:
             guide.write('\nR011 STRUCTURAL CORRECTION\nSelect the exact r011 collection in Question Library. Existing r010 records, owner edits and student activity are retained, never reassigned. Changed existing IDs produce explicit import conflicts; the updated v0.8.3 patch applies only untouched, unprepared revision-1 r010 drafts after comparing the complete stored baseline; local edits, prepared identities and approvals remain conflicts. Earlier v0.8.2 builds safely retain all such incoming differences without automatic reconstruction. The private correction plan identifies each proposed replacement and its r010 HTML fingerprints. Reload the current question revision in Question Library/Studio, compare your edits, and save corrections using the existing revision-safe controls. Superseded nested IDs remain in the historical r010 dataset with an explicit old-to-new map; they are not silently deleted or used to transfer notes/timer history.\n\nOriginal numbered requirements are grouped into complete problems where the source supports it. Genuine separate Roman-numbered cases remain independent. All records stay Needs Review; unresolved material source/answer/table issues have blocking integrity flags. Known official No correct option MCQs are retained for unscored review, not treated as missing key extraction.\n')
