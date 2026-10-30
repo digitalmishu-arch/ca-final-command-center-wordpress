@@ -365,7 +365,7 @@ def exact_answer(question,paper,answer_documents):
     return matches
 
 
-def paired_parts(question,answer):
+def paired_parts(question,answer, allow_roman_parts=True):
     """Corroborate printed top-level letter parts in both source regions.
 
     An answer need not contain imperative verbs. Matching sequence, indentation
@@ -388,6 +388,7 @@ def paired_parts(question,answer):
     qrefs=[r for r,_ in qm];arefs=[r for r,_ in am]
     unique=list(dict.fromkeys(qrefs))
     if not qm and not am:
+        if not allow_roman_parts:return [question],[answer],[]
         # Independent roman requirements may share one scenario (for example,
         # journal entries and a consolidated statement). Facts labelled (i)/(ii)
         # cannot qualify unless every question region has an operative request
@@ -439,19 +440,19 @@ def paired_parts(question,answer):
     return questions,answers,[]
 
 
-def practice_parts(question,answer):
+def practice_parts(question,answer, allow_roman_parts=True):
     """Also separate explicitly lettered cases within an Either/Or branch.
 
     Recursion is bounded and requires corroborating answer labels. Shared
     instructions remain linked common context instead of being discarded.
     """
-    questions,answers,warnings=paired_parts(question,answer)
+    questions,answers,warnings=paired_parts(question,answer,allow_roman_parts=allow_roman_parts)
     if warnings:return questions,answers,warnings
     finalq=[];finala=[]
     for q,a in zip(questions,answers):
         if not q['alternative']:
             finalq.append(q);finala.append(a);continue
-        nestedq,nesteda,issues=paired_parts(q,a)
+        nestedq,nesteda,issues=paired_parts(q,a,allow_roman_parts=allow_roman_parts)
         if issues or len(nestedq)==1:
             finalq.append(q);finala.append(a);continue
         for qq,aa in zip(nestedq,nesteda):

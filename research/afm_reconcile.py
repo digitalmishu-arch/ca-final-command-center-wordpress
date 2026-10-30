@@ -253,7 +253,7 @@ def discover(doc, d):
     profile.update(profile='afm-'+d['source_type']+'-source-aware',accepted_starts=[dict(side=q['side'],format=q['format'],reference=q['reference'],page=q['start']['page'])for q in records])
     return records,profile
 
-def split_question(q, a):
+def split_question(q, a, split_nested_requirements=False):
     def inline_part(record):
         if not record:return record
         record=deepcopy(record)
@@ -282,7 +282,7 @@ def split_question(q, a):
         answer_for_split=deepcopy(a)
         if not any(re.fullmatch('OR',l['text'],re.I)for l in q['lines']):
             answer_for_split['lines']=[{**l,'text':'Alternative solution method','spans':[dict(text='Alternative solution method',font=l.get('font',''),flags=0,bbox=l['bbox'])]}if re.fullmatch('OR',l['text'],re.I)else l for l in a['lines']]
-        try:qs,ans,warnings=gold.practice_parts(q,answer_for_split)
+        try:qs,ans,warnings=gold.practice_parts(q,answer_for_split,allow_roman_parts=split_nested_requirements)
         except ValueError as error:
             qs,issue=gold.split_independent(q);ans=[];warnings=['answer_alternative_boundary_conflict: '+str(error)]
         # Splitting decisions may use a neutral marker, but retained answer
@@ -295,11 +295,11 @@ def split_question(q, a):
             # missing/reordered. Never substitute a neighbouring whole answer.
             if q.get('source_type')in('mtp','exam'):
                 try:
-                    source_q,_,qw=gold.paired_parts(q,q)
+                    source_q,_,qw=gold.paired_parts(q,q,allow_roman_parts=split_nested_requirements)
                     if not qw and any(x.get('subreference')for x in source_q):qs=source_q;issue=None
                 except ValueError:pass
             try:
-                source_a,_,aw=gold.paired_parts(answer_for_split,answer_for_split)
+                source_a,_,aw=gold.paired_parts(answer_for_split,answer_for_split,allow_roman_parts=split_nested_requirements)
                 if not aw:ans=source_a
             except ValueError:pass
             for aa in ans:aa['lines']=[originals.get(pos(l),l)for l in aa['lines']]
@@ -313,6 +313,10 @@ def split_question(q, a):
     if len(ans)==1 and len(qs)==1 and qs[0].get('subreference')and not ans[0].get('subreference'):
         m=next((re.match(r'^\(([a-h])\)',l['text'])for l in ans[0]['lines'][:4]if re.match(r'^\(([a-h])\)',l['text'])),None)
         if m and m[1]==qs[0]['subreference']:ans[0]={**ans[0],'subreference':m[1]}
+    # Roman numerals and operative verbs do not establish independent problems.
+    # A source-specific decision may opt in only after distinct problem/marks
+    # and corresponding solution boundaries have been compared.
+    if not split_nested_requirements:return qs,ans,list(dict.fromkeys(warnings))
     # Independently operative roman requirements retain linked shared facts.
     def romans(record):
         hits=[];left=None
