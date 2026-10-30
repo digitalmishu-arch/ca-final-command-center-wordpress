@@ -24,7 +24,7 @@ def key(r):return r['reference'],r.get('subreference',''),r.get('practice_struct
 def rendered_hash(x):return gold.sha(x['body_html'])if x else None
 
 def audit(bank_path,profiles,baseline,decisions,output):
-    out=cat.private(output);out.mkdir(parents=True,exist_ok=True);bank=json.loads(Path(bank_path).read_text());old=deepcopy(bank['subjective']);source={s['file_id']:s for s in bank['source_inventory']};profiles=Path(profiles);cache={};keeps=json.loads(Path(decisions).read_text());groups=defaultdict(list);original={}
+    out=cat.private(output);out.mkdir(parents=True,exist_ok=True);bank=json.loads(Path(bank_path).read_text());old=deepcopy(bank['subjective']);source={s['file_id']:s for s in bank['source_inventory']};profiles=Path(profiles);cache={};keeps=json.loads(Path(decisions).read_text());groups=defaultdict(list);original={};original_mcqs={}
     with zipfile.ZipFile(baseline)as z:
         m=json.loads(z.read('manifest.json'))
         for entry in m['packages']:
@@ -34,6 +34,8 @@ def audit(bank_path,profiles,baseline,decisions,output):
                 for item in cm['items']:
                     if item['kind']=='questions':
                         for r in json.loads(child.read(item['path']))['records']:original[r['stable_id']]=r
+                    elif item['kind']=='mcqs':
+                        for r in json.loads(child.read(item['path']))['records']:original_mcqs[r['stable_id']]=r
     assert len(original)==1255 and set(original)=={x['import_record']['stable_id']for x in old}
     for row in old:groups[(row['source_file_id'],row['import_record']['reference'])].append(row)
     def profile(fid):
@@ -147,7 +149,13 @@ def audit(bank_path,profiles,baseline,decisions,output):
             br=before['import_record'];matches=[(row,q,a,inputs)for row,q,a,inputs in targets if before in inputs];assert len(matches)==1,(br['stable_id'],len(matches));row,q,a,inputs=matches[0];nr=row['import_record'];grouped=br['stable_id']!=nr['stable_id'];action='combined_into_complete_problem_no_activity_transfer'if grouped else'identity_retained';mapping.append(dict(old_id=br['stable_id'],new_id=nr['stable_id'],action=action,old_subreference=br['subreference'],new_subreference=nr['subreference'],old_question_html_sha256=rendered_hash(before['question']),old_answer_html_sha256=rendered_hash(before.get('answer')),new_question_html_sha256=rendered_hash(row['question']),new_answer_html_sha256=rendered_hash(row.get('answer')),student_history='Remain on original IDs; never automatically reassigned',existing_edit_policy='Retain current WordPress edits; show import conflict; owner correction uses current revision'))
             if before['match_state']in('B','C'):
                 outcome='parent_requirement_granularity_resolved'if grouped and row['match_state']=='A'else'same_source_answer_warning_reclassified'if not grouped and row['match_state']=='A'else'remains_unresolved'
-                ledger.append(dict(old_id=br['stable_id'],new_id=nr['stable_id'],old_state=before['match_state'],new_state=row['match_state'],outcome=outcome,confirmed_wrong_answer=False,source_file_id=fid,answer_file_id=afid,question_region=structure.span_evidence(q),answer_region=structure.span_evidence(a),evidence=row['match_evidence'],question_text_preview=row['question']['plain_text'][:650],answer_text_preview=(row.get('answer')or{}).get('plain_text','')[:650],comparison='Source PDF native lines and layout coordinates compared; not independent human academic approval'))
+                original_answer=br.get('answer')or{};contradictions=[]
+                if original_answer:
+                    for ak,qk in [('question_identity','stable_id'),('question_reference','reference'),('question_subreference','subreference'),('subject_code','subject_code'),('source_type','source_type'),('exam_attempt','exam_attempt'),('mtp_series','mtp_series')]:
+                        if ak in original_answer and original_answer[ak]!=br[qk]:contradictions.append(ak)
+                    if original_answer.get('question_source_hash',br['source_hash'])!=br['source_hash']:contradictions.append('question_source_hash')
+                    if original_answer.get('source_hash')!=source[before['answer_file_id']]['source_hash']:contradictions.append('answer_document_hash')
+                ledger.append(dict(old_id=br['stable_id'],new_id=nr['stable_id'],old_state=before['match_state'],new_state=row['match_state'],outcome=outcome,confirmed_wrong_answer=bool(contradictions),source_identity_contradictions=contradictions,semantic_wrong_answer_assessment='Not independently established; source/context corroboration is not human academic verification',source_file_id=fid,answer_file_id=afid,question_region=structure.span_evidence(q),answer_region=structure.span_evidence(a),evidence=row['match_evidence'],question_text_preview=row['question']['plain_text'][:650],answer_text_preview=(row.get('answer')or{}).get('plain_text','')[:650],comparison='Source PDF native lines and layout coordinates compared; not independent human academic approval'))
         if config.get('related_recovered_subreferences'):
             for link in mapping:
                 if link['old_id']in[x['import_record']['stable_id']for x in previous]and link['old_subreference']in config['related_recovered_subreferences']:
@@ -161,7 +169,11 @@ def audit(bank_path,profiles,baseline,decisions,output):
     # official outcome, not failed extraction or an invented correct choice.
     nco=[]
     for row in bank['mcqs']:
-        r=row['import_record'];r['exceptions']=sorted(set(r['exceptions']));ev=r['answer'].get('key_evidence',{})
+        r=row['import_record'];ev=r['answer'].get('key_evidence',{})
+        if not ev.get('no_correct_option'):
+            if r['stable_id']in original_mcqs:row['import_record']=deepcopy(original_mcqs[r['stable_id']])
+            continue
+        r['exceptions']=sorted(set(r['exceptions']))
         if ev.get('no_correct_option'):
             assert not ev['correct_options']and not r['correct_options'];r['key_policy']='needs_owner_decision';r['key_verified']=False;r['exceptions']=[x for x in r['exceptions']if x not in('official_key_reports_no_correct_option','matching_explicit_answer_key_missing')]+['official_outcome_no_correct_option_unscored'];r['review_notes']='Official source key explicitly states No correct option. Original options retained. This is a known official outcome, not a missing-key extraction failure. Held outside ordinary scored practice until applicable official marking guidance is established.';r['explanation_html']='<p>The official answer key states <strong>No correct option</strong>. No option is designated correct. This question is retained for unscored academic review; ordinary single-correct scoring is withheld.</p>';nco.append(dict(question_id=r['stable_id'],source_file_id=row['source_file_id'],page=ev['page'],source_line=ev['source_line'],bbox=ev['bbox'],outcome='official_no_correct_option',scoring='not_scored',owner_approval=False))
     # Recompute source coverage, preserving all document identity exceptions.
@@ -169,7 +181,7 @@ def audit(bank_path,profiles,baseline,decisions,output):
     for row in new:per[row['source_file_id']].append(row)
     for c in bank['coverage']:
         rs=per[c['file_id']];c.update(subjective_parts=len(rs),source_corroborated_answers=sum(x['match_state']=='A'for x in rs),answer_candidates=sum(x['match_state']=='B'for x in rs),answer_pending=sum(x['match_state']in('C','D','E')for x in rs),blocked_questions=sum(any('question_integrity_failed'in w for w in x['import_record']['blocking_exceptions'])for x in rs),import_subjective=len(rs))
-    summary=dict(baseline_subjective=1255,revised_subjective=len(new),parents_audited=len(parent_audit),old_warnings_audited=len(ledger),old_warning_outcomes=dict(Counter(x['outcome']for x in ledger)),confirmed_wrong_answer_associations=0,answer_states=dict(Counter(x['match_state']for x in new)),old_entries_combined=sum(x['action'].startswith('combined')for x in mapping),retained_original_ids=sum(x['action']=='identity_retained'for x in mapping),new_complete_problem_ids=len({x['import_record']['stable_id']for x in new}-set(original)),new_problem_identities_not_primary_mapping_targets=sorted({x['import_record']['stable_id']for x in new}-{x['new_id']for x in mapping}),material_changes=len(material),changed_tables=len(changed_tables),native_regions_reconstructed=reconstructed,official_no_correct_option_mcqs=len(nco),duplicated_r010_no_correct_option_flags=2,question_integrity_holds=sum(any('question_integrity_failed'in w for w in x['import_record']['blocking_exceptions'])for x in new),table_formula_issue_records=sum(any(re.search('table|formula|glyph|numeric|geometry|font',w,re.I)for w in x['import_record']['blocking_exceptions'])for x in new),owner_academic_approvals=0,publications=0)
+    summary=dict(baseline_subjective=1255,revised_subjective=len(new),parents_audited=len(parent_audit),old_warnings_audited=len(ledger),old_warning_outcomes=dict(Counter(x['outcome']for x in ledger)),confirmed_wrong_answer_associations=sum(bool(x['source_identity_contradictions'])for x in ledger),semantic_wrong_answer_count='Not independently established for unresolved cases',answer_states=dict(Counter(x['match_state']for x in new)),old_entries_combined=sum(x['action'].startswith('combined')for x in mapping),retained_original_ids=sum(x['action']=='identity_retained'for x in mapping),new_complete_problem_ids=len({x['import_record']['stable_id']for x in new}-set(original)),new_problem_identities_not_primary_mapping_targets=sorted({x['import_record']['stable_id']for x in new}-{x['new_id']for x in mapping}),material_changes=len(material),changed_tables=len(changed_tables),native_regions_reconstructed=reconstructed,official_no_correct_option_mcqs=len(nco),duplicated_r010_no_correct_option_flags=2,question_integrity_holds=sum(any('question_integrity_failed'in w for w in x['import_record']['blocking_exceptions'])for x in new),table_formula_issue_records=sum(any(re.search('table|formula|glyph|numeric|geometry|font',w,re.I)for w in x['import_record']['blocking_exceptions'])for x in new),owner_academic_approvals=0,publications=0)
     for name,obj in [('bank-r011.json',bank),('answer-warning-audit.json',ledger),('old-to-new-identities.json',mapping),('material-changes.json',material),('changed-tables.json',changed_tables),('complete-parent-audit.json',parent_audit),('official-no-correct-option.json',nco),('summary.json',summary)]:
         if name=='bank-r011.json':(out/name).write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')))
         else:cat.write(out/name,obj)
