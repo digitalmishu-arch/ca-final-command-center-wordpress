@@ -13,7 +13,16 @@ final class CAFCC_Publication_Diagnostics {
         $states=$wpdb->get_results($wpdb->prepare('SELECT ordinal,kind,status FROM '.CAFCC_Package::items_table().' WHERE package_id=%d ORDER BY ordinal',$id),ARRAY_A);
         $expected=(int)($manifest['coverage']['subjective']??$manifest['coverage']['draft_candidates']??0);
         $out=array('id'=>(int)$id,'package_key'=>$p['package_key'],'status'=>$p['status'],'cursor'=>(int)$p['cursor_position'],'checkpoints'=>$states,'expected_subjective'=>$expected,'linked_subjective'=>count(array_unique(array_column($members,'review_id'))),'excluded_by_saved_selection'=>$excluded,'identity_aliases'=>$aliases);
-        if(($manifest['format']??'')===CAFCC_Collection::FORMAT){$report=CAFCC_Collection::result_summary($id);if(!is_wp_error($report))$out['import_conflicts']=$report;}
+        if(($manifest['format']??'')===CAFCC_Collection::FORMAT){
+            $report=CAFCC_Collection::result_summary($id);if(!is_wp_error($report))$out['import_conflicts']=$report;
+            $out['child_progress']=array();
+            foreach($manifest['groups']??array()as $group){
+                $child=$wpdb->get_row($wpdb->prepare('SELECT id,status,cursor_position FROM '.CAFCC_Package::table().' WHERE owner_id=%d AND package_key=%s',get_current_user_id(),$group['package_key']),ARRAY_A);
+                $progress=array('package_key'=>$group['package_key'],'record_kind'=>$group['record_kind'],'expected_records'=>(int)$group['records'],'status'=>$child['status']??'not_started','cursor'=>(int)($child['cursor_position']??0));
+                if($child&&$child['status']!=='completed')$progress['items']=$wpdb->get_results($wpdb->prepare('SELECT ordinal,kind,status,CASE WHEN kind IN (\'questions\',\'mcqs\') THEN JSON_LENGTH(JSON_EXTRACT(payload,\'$.records\')) ELSE NULL END expected_records FROM '.CAFCC_Package::items_table().' WHERE package_id=%d ORDER BY ordinal',$child['id']),ARRAY_A);
+                $out['child_progress'][]=$progress;
+            }
+        }
         return $out;
     }
     public static function page($key,$page=1){

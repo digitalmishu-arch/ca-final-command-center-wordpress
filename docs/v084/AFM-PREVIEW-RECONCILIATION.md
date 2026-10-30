@@ -21,12 +21,12 @@ four aggregate counts or from a different disposable database.
    **Download private diagnostic report**. Close the panel without confirming.
 4. Keep the JSON private and provide it through the authorised restricted review
    folder. It contains selected IDs/revisions, active filters, package checkpoint
-   states, excluded memberships, conflicts, source hashes and exact blocker
+   states (including an unfinished child’s individual record batches), excluded memberships, conflicts, source hashes and exact blocker
    labels. It omits academic prose, student activity and permission documents.
 
 The export is paginated, nonce-protected, administrator-only and restricted to
 the owner of the saved preview. Each row distinguishes the saved preview message
-from current validation. Missing question text remains blocking; it no longer
+from current validation. New previews freeze the resolved Current package ID; for older previews the export labels that historical package resolution may be unavailable, while preserving the actual selected IDs. Missing question text remains blocking; it no longer
 also produces a fictitious private-reference or invalid-table diagnosis.
 
 ## What the r012 package changes

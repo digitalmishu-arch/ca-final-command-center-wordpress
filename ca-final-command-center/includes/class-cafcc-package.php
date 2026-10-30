@@ -105,7 +105,7 @@ final class CAFCC_Package {
             if(!$base||($base['subject_code']??'')!=='AFM'||$base['source_hash']!==$data['source_hash'])return array('applied'=>false,'reason'=>'Original r010 source identity not found.');
             foreach(array('question','answer')as $kind)if(!hash_equals($marker['baseline_'.$kind.'_hash']??'',hash('sha256',$base['rich_content'][$kind]['body_html']??'')))return array('applied'=>false,'reason'=>'Baseline content fingerprint differs.');
             $base=CAFCC_Studio::clean(self::proposed_taxonomy($base));if(is_wp_error($base)||!hash_equals($current['payload_hash'],hash('sha256',wp_json_encode($base))))return array('applied'=>false,'reason'=>'Current draft differs from its entire stored r010 payload; local changes retained.');
-            $saved=CAFCC_Studio::save((int)$current['id'],array('expected_revision'=>1,'data'=>$data));if(is_wp_error($saved))return array('applied'=>false,'reason'=>$saved->get_error_message());
+            $saved=CAFCC_Studio::save((int)$current['id'],array('expected_revision'=>(int)$current['revision'],'data'=>$data));if(is_wp_error($saved))return array('applied'=>false,'reason'=>$saved->get_error_message());
             return array('applied'=>true,'id'=>(int)$current['id'],'revision'=>(int)$saved['revision'],'publication_status'=>'draft','academic_approval'=>false);
         });
     }
