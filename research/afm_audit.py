@@ -108,7 +108,8 @@ def audit(bank_path,profiles,baseline,decisions,output):
                 if not sr['fidelity']['passed']:r['blocking_exceptions'].append('question_integrity_failed_shared_scenario_format')
             if answer:
                 r['rich_content']['answer']=prior.content(answer);r['answer']=dict(source_hash=source[afid]['source_hash'],official_url='https://drive.google.com/file/d/'+afid+'/view',reference=ref,subreference=sub,alternative=alt,question_identity=sid,question_reference=ref,question_subreference=sub,question_source_hash=r['source_hash'],page=str(prior.page(a)),subject_code='AFM',source_type=r['source_type'],exam_attempt=r['exam_attempt'],mtp_series=r['mtp_series'],mode='licensed',notes='r011 '+state+': exact source-context and complete-problem answer region; automated/AI-assisted source comparison, not independent human academic verification.')
-            marks=re.findall(r'\((\d{1,2})\s*Marks?\)',body['plain_text'],re.I);r['marks']=int(marks[-1])if len(set(marks))==1 else None;r['marks_verified']=r['marks']is not None
+            marks=re.findall(r'\((\d{1,2})\s*Marks?\)',body['plain_text'],re.I);r['marks']=int(marks[0])if len(marks)==1 else None;r['marks_verified']=r['marks']is not None
+            r['question_type']='practical'if any(x['type']=='table'for x in body['blocks'])or re.search(r'\bcalculate|\bcompute|\bprepare|\bdetermine|\bevaluate|\badvi[cs]e',body['plain_text'],re.I)else'theory'
             proposed=afm.tags(checkq,answer_region)if not exact else deepcopy(template['proposed_topics'])
             if not exact and proposed:
                 edition=r['ai_proposal']['historical_edition'];tax=next((v for k,v in bank['taxonomies'].items()if k==edition or(k[:63]+'-'+gold.sha(k)[:16]if len(k)>80 else k)==edition),None)
@@ -129,7 +130,7 @@ def audit(bank_path,profiles,baseline,decisions,output):
                 # Preserve exact unchanged import payloads, rather than create
                 # gratuitous revision conflicts in otherwise untouched records.
                 oldr=original[old_id];same_content=all(oldr.get('rich_content',{}).get(k,{}).get('body_html')==r.get('rich_content',{}).get(k,{}).get('body_html')for k in('question','answer'))and oldr.get('practice_structure',{}).get('scenario_key')==r['practice_structure'].get('scenario_key')
-                if same_content and exact['match_state']=='A'and not issues and not boundary_evidence and not config.get('printed_label_conflict'):r=deepcopy(oldr);row['import_record']=r
+                if same_content and exact['match_state']=='A'and not issues and not boundary_evidence and not config.get('printed_label_conflict')and oldr.get('marks')==r.get('marks')and oldr.get('question_type')==r.get('question_type'):r=deepcopy(oldr);row['import_record']=r
             row['import_record']['blocking_exceptions']=sorted(set(row['import_record']['blocking_exceptions']))
             new.append(row);targets.append((row,q,a,inputs))
             changed=not exact or original[old_id].get('rich_content')!=r.get('rich_content')
